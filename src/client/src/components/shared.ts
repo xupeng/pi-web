@@ -86,16 +86,19 @@ export interface CompletionItem {
 export const appStyles = css`
   /* Mobile browsers already subtract browser controls from 100dvh; reserve bottom safe area only in standalone PWA modes. */
   :host { --pi-app-safe-area-bottom: 0px; position: fixed; top: 0; right: 0; left: 0; display: block; height: 100dvh; box-sizing: border-box; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--pi-app-safe-area-bottom) env(safe-area-inset-left); color: var(--pi-text); background: var(--pi-bg); font: 14px system-ui, sans-serif; }
+  @media (min-width: 761px) {
+    :host { --pi-content-font-family: "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; --pi-content-font-size: 16px; --pi-content-font-weight: 500; --pi-content-line-height: 1.75; --pi-content-block-gap: .75em; --pi-content-message-gap: 24px; --pi-content-code-font-family: "Cascadia Code", var(--pi-control-monospace-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); --pi-content-code-font-size: 14px; --pi-content-code-font-weight: 400; --pi-content-code-line-height: 1.6; }
+  }
   :host([pwa-display-mode]) { --pi-app-safe-area-bottom: env(safe-area-inset-bottom); }
   @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
     :host { --pi-app-safe-area-bottom: env(safe-area-inset-bottom); }
   }
-  .shell { --navigation-panel-size: 340px; --workspace-panel-size: minmax(360px, 42vw); --navigation-panel-width: var(--navigation-panel-size); --workspace-panel-width: var(--workspace-panel-size); display: grid; grid-template-columns: var(--navigation-panel-width) 1px minmax(320px, 1fr) 1px var(--workspace-panel-width); height: 100%; min-height: 0; }
+  .shell { --navigation-panel-size: clamp(280px, 21vw, 320px); --workspace-panel-size: clamp(340px, 32vw, 480px); --panel-gutter-size: clamp(18px, 1.2vw, 20px); --navigation-panel-width: var(--navigation-panel-size); --workspace-panel-width: var(--workspace-panel-size); display: grid; grid-template-columns: var(--navigation-panel-width) var(--panel-gutter-size) minmax(360px, 1fr) var(--panel-gutter-size) var(--workspace-panel-width); height: 100%; min-height: 0; }
   aside { grid-column: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   aside app-navigation-panel { flex: 1 1 auto; min-height: 0; }
   header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--pi-border); }
   .header-actions { display: flex; align-items: center; gap: 8px; }
-  main { grid-column: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  main { --pi-main-content-max: 960px; --pi-main-padding-inline: clamp(18px, 2.2vw, 32px); grid-column: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .context-bar { position: relative; flex: 0 0 auto; min-width: 0; display: none; align-items: center; gap: 0; padding: 6px 0; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
   .context-bar::before, .context-bar::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 2; width: 20px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
   .context-bar::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
@@ -448,8 +451,9 @@ export const chatStyles = css`
   }
   formatted-text.part { display: block; }
   formatted-text.part, .queued-message formatted-text { text-align: start; unicode-bidi: plaintext; }
+  formatted-text.part, .part > formatted-text, .queued-message formatted-text { font-family: var(--pi-content-font-family, inherit); font-size: var(--pi-content-font-size, inherit); font-weight: var(--pi-content-font-weight, inherit); line-height: var(--pi-content-line-height, inherit); }
   .part { max-width: 100%; min-width: 0; box-sizing: border-box; overflow: visible; }
-  .part + .part { margin-top: 10px; }
+  .part + .part { margin-top: 12px; }
   .tool-line { color: var(--pi-warning); }
   .summary { color: var(--pi-muted); margin-left: 6px; }
   .part:is(details) { border-top: 1px solid var(--pi-border); padding-top: 8px; }
@@ -459,7 +463,7 @@ export const chatStyles = css`
   .skill-invocation > small, .skill-read > small { display: block; margin: 6px 0 0; color: var(--pi-muted); }
   summary { cursor: pointer; color: var(--pi-muted); }
   pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; direction: ltr; text-align: left; unicode-bidi: isolate; }
-  .shell-output { color: var(--pi-text); font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.45; direction: ltr; text-align: left; unicode-bidi: isolate; }
+  .shell-output { color: var(--pi-text); font-family: var(--pi-content-code-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: var(--pi-content-code-font-size, 13px); font-weight: var(--pi-content-code-font-weight, 400); line-height: var(--pi-content-code-line-height, 1.45); direction: ltr; text-align: left; unicode-bidi: isolate; }
   @media (max-width: 760px) {
     .chat { --pi-chat-sticky-top: -20px; padding-top: 20px; padding-bottom: 68px; }
     .msg { padding: 14px; }
@@ -473,12 +477,12 @@ export const chatStyles = css`
 
 export const formattedTextStyles = css`
   :host { display: block; }
-  .formatted { white-space: normal; overflow-wrap: anywhere; line-height: 1.45; text-align: start; unicode-bidi: plaintext; }
-  p, ul, ol, pre, blockquote, .table-scroll, .code-block-wrapper { margin: 0 0 10px; }
+  .formatted { white-space: normal; overflow-wrap: anywhere; line-height: var(--pi-content-line-height, 1.45); text-align: start; unicode-bidi: plaintext; }
+  p, ul, ol, pre, blockquote, .table-scroll, .code-block-wrapper { margin: 0 0 var(--pi-content-block-gap, 10px); }
   :is(p, ul, ol, pre, blockquote, .table-scroll, .code-block-wrapper):last-child { margin-bottom: 0; }
   ul, ol { padding-left: 22px; }
-  li + li { margin-top: 3px; }
-  code { border: 1px solid var(--pi-border); border-radius: 4px; background: var(--pi-bg); padding: 1px 4px; font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; direction: ltr; text-align: left; unicode-bidi: isolate; }
+  li + li { margin-top: 4px; }
+  code { border: 1px solid var(--pi-border); border-radius: 4px; background: var(--pi-bg); padding: 1px 4px; font-family: var(--pi-content-code-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: var(--pi-content-code-font-size, 13px); font-weight: var(--pi-content-code-font-weight, 400); line-height: var(--pi-content-code-line-height, 1.45); direction: ltr; text-align: left; unicode-bidi: isolate; }
   .code-block-wrapper { position: relative; }
   .code-block-wrapper pre { margin: 0; padding-right: 40px; }
   pre { border: 1px solid var(--pi-border); border-radius: 8px; background: var(--pi-bg); padding: 10px; overflow-x: auto; overflow-y: hidden; direction: ltr; text-align: left; unicode-bidi: isolate; }
@@ -493,6 +497,12 @@ export const formattedTextStyles = css`
   h2 { font-size: 17px; }
   h3 { font-size: 15px; }
   h4 { font-size: 14px; }
+  @media (min-width: 761px) {
+    h1 { font-size: 22px; }
+    h2 { font-size: 19px; }
+    h3 { font-size: 17px; }
+    h4 { font-size: 15px; }
+  }
   .table-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
   .table-scroll:focus-visible { outline: 1px solid var(--pi-accent); outline-offset: 2px; }
   table { border-collapse: collapse; width: max-content; min-width: 100%; max-width: none; }
