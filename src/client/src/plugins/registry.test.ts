@@ -518,8 +518,17 @@ describe("PluginRegistry", () => {
     expect(registry.getThemes().map((theme) => ({ id: theme.id, colorScheme: theme.colorScheme }))).toEqual([
       { id: "themes:pi-web-dark", colorScheme: "dark" },
       { id: "themes:pi-web-light", colorScheme: "light" },
+      { id: "themes:absolutely", colorScheme: "dark" },
       { id: "themes:classic", colorScheme: "dark" },
     ]);
+    expect(registry.getThemes().find((theme) => theme.id === "themes:absolutely")).toMatchObject({
+      name: "Absolutely",
+      tokens: {
+        "--pi-bg": "#2d2d2b",
+        "--pi-text": "#f9f9f7",
+        "--pi-accent": "#cc7d5e",
+      },
+    });
     expect(registry.getThemePairs().map((pair) => ({ id: pair.id, light: pair.light, dark: pair.dark }))).toEqual([
       { id: "themes:pi-web", light: "themes:pi-web-light", dark: "themes:pi-web-dark" },
     ]);
