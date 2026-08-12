@@ -61,6 +61,7 @@ export class PromptEditor extends LitElement {
   private readonly readOnlyCompartment = new Compartment();
   private readonly mobilePromptEnterMedia = createMobilePromptEnterMedia();
   private explicitShiftKeyActive = false;
+  private placeholderHeightObserver: ResizeObserver | undefined;
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (!changed.has("sessionId") && !changed.has("machineId")) return;
@@ -96,6 +97,8 @@ export class PromptEditor extends LitElement {
   }
 
   override disconnectedCallback(): void {
+    this.placeholderHeightObserver?.disconnect();
+    this.placeholderHeightObserver = undefined;
     this.editor?.destroy();
     this.editor = undefined;
     super.disconnectedCallback();
@@ -286,7 +289,10 @@ export class PromptEditor extends LitElement {
           this.editableCompartment.of(EditorView.editable.of(!this.disabled)),
           this.readOnlyCompartment.of(EditorState.readOnly.of(this.disabled)),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) this.updateDraft(update.state.doc.toString());
+            if (update.docChanged) {
+              this.updateDraft(update.state.doc.toString());
+              this.syncPlaceholderHeight();
+            }
           }),
           keymap.of([
             { any: (view, event) => this.handleEditorKeyDown(event, view) },
@@ -302,6 +308,33 @@ export class PromptEditor extends LitElement {
         ],
       }),
     });
+    this.syncPlaceholderHeight();
+  }
+
+  /**
+   * The prompt placeholder is laid out absolutely (out of the document flow) so
+   * the caret line stays a single line high on every platform; otherwise a
+   * multi-line placeholder stretches the `.cm-line`, and with it the caret
+   * rect. Keep the editor's min-height in sync with the placeholder's actual
+   * height so the hint is still fully visible inside the input box.
+   */
+  private syncPlaceholderHeight() {
+    const editor = this.editor;
+    if (!editor) return;
+    this.placeholderHeightObserver?.disconnect();
+    this.placeholderHeightObserver = undefined;
+    const placeholder = editor.dom.querySelector(".cm-placeholder");
+    if (!(placeholder instanceof HTMLElement)) {
+      editor.dom.style.minHeight = "";
+      return;
+    }
+    const placeholderHeight = placeholder.getBoundingClientRect().height;
+    // placeholder content + .cm-content vertical padding (2 * 8px) + editor border (2px)
+    const minHeight = Math.min(Math.max(54, Math.ceil(placeholderHeight) + 18), 220);
+    editor.dom.style.minHeight = `${String(minHeight)}px`;
+    if (typeof ResizeObserver === "undefined") return;
+    this.placeholderHeightObserver = new ResizeObserver(() => { this.syncPlaceholderHeight(); });
+    this.placeholderHeightObserver.observe(placeholder);
   }
 
   private syncEditorDoc() {
