@@ -27,6 +27,7 @@ import {
 } from "../sessionNotifications";
 import type { ChatLine, ChatPart } from "./shared";
 import { chatStyles, renderSessionWarningIcon } from "./shared";
+import { markdownHasWideBlock } from "../formatting/markdown";
 import "./AskUserCard";
 import "./ExtensionDialogCard";
 import type { ExtensionDialogAnswerCallback, ExtensionDialogCancelCallback, ExtensionDialogDismissCallback } from "./ExtensionDialogCard";
@@ -126,6 +127,16 @@ export function chatGroupScrollMarkerId(endIndex: number): string {
 /** The CSS class list for an event-group `<details>`, distinguishing the live tail. */
 export function chatMessageGroupClassName(defaultOpen: boolean): string {
   return defaultOpen ? "msg event-group live" : "msg event-group";
+}
+
+/** Give structured and intrinsically wide transcript content the wider chat frame. */
+export function chatMessageClassName(message: ChatLine): string {
+  const wideRole = message.role === "tool" || message.role === "bash" || message.role === "skill";
+  const widePart = message.parts.some((part) => {
+    if (part.type === "text") return markdownHasWideBlock(part.text);
+    return part.type !== "thinking" && part.type !== "empty";
+  });
+  return `msg ${message.role}${wideRole || widePart ? " wide" : ""}`;
 }
 
 /** The disclosure summary label for an event group, distinguishing the live tail. */
@@ -830,7 +841,7 @@ export class ChatView extends LitElement {
     const shellClass = toolOnly ? "msg tool-execution-shell" : "msg ask-user-record-shell";
     return html`
       ${this.renderScrollMarker(this.messageScrollMarkerId(index))}
-      <article class=${toolOnly || askUserRecordOnly ? shellClass : `msg ${message.role}`} data-index=${index} data-scroll-anchor-id=${this.messageAnchorKey(index)}>
+      <article class=${toolOnly || askUserRecordOnly ? shellClass : chatMessageClassName(message)} data-index=${index} data-scroll-anchor-id=${this.messageAnchorKey(index)}>
         ${toolOnly || askUserRecordOnly ? null : this.renderMessageHeader(message, String(index))}
         ${message.parts.map((part) => this.renderPart(part, message))}
       </article>

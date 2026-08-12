@@ -12,6 +12,7 @@ import {
   chatEventAnchorKey,
   chatGroupAnchorKey,
   chatGroupScrollMarkerId,
+  chatMessageClassName,
   chatMessageGroupClassName,
   chatMessageGroupLabel,
   chatMessageMetadataLabel,
@@ -283,6 +284,14 @@ describe("chat event-group content seams", () => {
     expect(chatMessageGroupClassName(false)).toBe("msg event-group");
     expect(chatMessageGroupLabel(true)).toBe("live events");
     expect(chatMessageGroupLabel(false)).toBe("events");
+  });
+
+  it("uses the wide transcript frame only for structured message content", () => {
+    expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "A readable paragraph." }] })).toBe("msg assistant");
+    expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "```ts\nconst wide = true;\n```" }] })).toBe("msg assistant wide");
+    expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "| A | B |\n| - | - |\n| 1 | 2 |" }] })).toBe("msg assistant wide");
+    expect(chatMessageClassName({ role: "user", parts: [{ type: "image", mimeType: "image/png", data: "QUJD" }] })).toBe("msg user wide");
+    expect(chatMessageClassName({ role: "bash", parts: [{ type: "text", text: "done" }] })).toBe("msg bash wide");
   });
 });
 
