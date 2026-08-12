@@ -304,7 +304,7 @@ export class WorkspaceFileViewer extends LitElement {
   static override styles = [
     formattedTextStyles,
     css`
-      :host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; color: var(--pi-text); font: 14px system-ui, sans-serif; }
+      :host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; color: var(--pi-text); font: 14px var(--pi-control-monospace-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); }
       .viewer-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
       .viewer-header strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .viewer-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
@@ -315,7 +315,7 @@ export class WorkspaceFileViewer extends LitElement {
       .viewer-mode { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
       .viewer-mode button, .preview-state button { border: 1px solid var(--pi-border); border-radius: 6px; background: var(--pi-surface); color: var(--pi-text); padding: 4px 9px; cursor: pointer; font: inherit; }
       .viewer-mode button { font-size: 12px; }
-      .viewer-mode button[aria-pressed="true"] { border-color: var(--pi-accent); background: var(--pi-selection-bg); }
+      .viewer-mode button[aria-pressed="true"] { font: inherit; border-color: var(--pi-accent); background: var(--pi-selection-bg); }
       .viewer-mode button:focus-visible, .preview-state button:focus-visible, a:focus-visible { outline: 2px solid var(--pi-accent); outline-offset: 1px; }
       code-viewer { flex: 1 1 auto; min-height: 0; }
       .markdown-preview { flex: 1 1 auto; min-height: 0; box-sizing: border-box; overflow: auto; padding: 16px; font-family: var(--pi-content-font-family, inherit); font-size: var(--pi-content-font-size, inherit); font-weight: var(--pi-content-font-weight, inherit); line-height: var(--pi-content-line-height, 1.45); }

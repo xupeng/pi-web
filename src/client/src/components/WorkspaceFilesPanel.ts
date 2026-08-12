@@ -357,7 +357,7 @@ export class WorkspaceFilesPanel extends LitElement {
   static override styles = [
     workspacePanelStyles,
     css`
-      :host { flex: 1 1 auto; }
+      :host { flex: 1 1 auto; font-family: var(--pi-control-monospace-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); }
       workspace-file-viewer { flex: 1 1 auto; min-height: 0; }
       .files-panel { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
       .toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
