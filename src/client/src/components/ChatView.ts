@@ -85,6 +85,34 @@ export interface QueuedMessageSection {
   messages: QueuedSessionMessage[];
 }
 
+function isQueuedSessionMessage(value: unknown): value is QueuedSessionMessage {
+  return typeof value === "object"
+    && value !== null
+    && "kind" in value
+    && "text" in value
+    && (value.kind === "steer" || value.kind === "followUp")
+    && typeof value.text === "string";
+}
+
+function queuedMessageListsEqual(left: QueuedSessionMessage[], right: QueuedSessionMessage[]): boolean {
+  return left.length === right.length
+    && left.every((message, index) => {
+      const other = right[index];
+      if (other === undefined) return false;
+      return other.kind === message.kind && other.text === message.text;
+    });
+}
+
+function queuedMessagesFromUnknown(value: unknown): QueuedSessionMessage[] | undefined {
+  return Array.isArray(value) && value.every(isQueuedSessionMessage) ? value : undefined;
+}
+
+function queuedMessagesFromUnknownStatus(value: unknown): QueuedSessionMessage[] {
+  if (typeof value !== "object" || value === null) return [];
+  if (!("queuedMessages" in value)) return [];
+  return queuedMessagesFromUnknown(value.queuedMessages) ?? [];
+}
+
 export function chatQueuedMessageSections(clientQueued: QueuedSessionMessage[], serverQueued: QueuedSessionMessage[]): QueuedMessageSection[] {
   return [
     clientQueued.length === 0 ? undefined : { source: "client", heading: "Queued until session starts", detail: "Will send once the backend session is ready", messages: clientQueued },
@@ -364,6 +392,7 @@ export class ChatView extends LitElement {
   }
 
   protected override updated(changed: Map<string, unknown>): void {
+    const queuedMessagesChanged = this.queuedMessagesChanged(changed);
     if (changed.has("loadingMore") && !this.loadingMore) this.loadMoreRequested = false;
     if (changed.has("hasMore") && !this.hasMore) this.loadMoreRequested = false;
     if (changed.has("sessionId")) this.restoreScrollPosition();
@@ -373,12 +402,20 @@ export class ChatView extends LitElement {
     // one rather than applying the usual live-tail scroll and landing at its end.
     if (!changed.has("sessionId") && openedAsk && this.pinnedToBottom) this.scrollToOpenAsk();
     else if (!changed.has("sessionId") && openedDialog && this.pinnedToBottom) this.scrollToOpenDialog();
-    else if (!changed.has("sessionId") && (changed.has("messages") || changed.has("pendingAsk") || changed.has("pendingDialogs") || changed.has("closedDialogs")) && this.pinnedToBottom) this.scrollToBottom();
+    else if (!changed.has("sessionId") && (changed.has("messages") || changed.has("pendingAsk") || changed.has("pendingDialogs") || changed.has("closedDialogs") || queuedMessagesChanged) && this.pinnedToBottom) this.scrollToBottom();
     if (changed.has("messages") || changed.has("messageStart") || changed.has("messageTotal") || changed.has("hasMore") || changed.has("loadingMore")) this.scheduleConversationRailUpdate();
     if (changed.has("messages") || changed.has("messageStart") || changed.has("hasMore") || changed.has("loadingMore") || changed.has("pendingAsk") || changed.has("pendingDialogs") || changed.has("closedDialogs")) this.continuePendingScrollRestore();
     if (changed.has("messages") || changed.has("hasMore") || changed.has("loadingMore")) this.requestLoadMoreIfNeeded();
     if (changed.has("notificationInbox") && this.pendingNotificationFocus !== undefined) this.focusPendingNotificationTarget();
     if (changed.has("zoomedImage")) this.syncImageZoomDialog();
+  }
+
+  private queuedMessagesChanged(changed: Map<string, unknown>): boolean {
+    const previousClientQueued = queuedMessagesFromUnknown(changed.get("clientQueuedMessages"));
+    if (previousClientQueued !== undefined && !queuedMessageListsEqual(previousClientQueued, this.clientQueuedMessages)) return true;
+    if (!changed.has("status")) return false;
+    const previousServerQueued = queuedMessagesFromUnknownStatus(changed.get("status"));
+    return !queuedMessageListsEqual(previousServerQueued, this.status?.queuedMessages ?? []);
   }
 
   private syncImageZoomDialog(): void {
@@ -707,12 +744,16 @@ export class ChatView extends LitElement {
             <button type="button" class="queued-clear-button" title="Clear queued messages without stopping active work" @click=${this.handleClearServerQueue}>Clear queue</button>
           ` : null}
         </div>
-        ${section.messages.map((message, index) => html`
-          <div class="queued-message">
-            <span class="queued-kind">${message.kind === "steer" ? "Steer" : "Follow-up"} ${String(index + 1)}</span>
-            <formatted-text .text=${message.text}></formatted-text>
-          </div>
-        `)}
+        <ol class="queued-message-list">
+          ${section.messages.map((message) => html`
+            <li class="queued-message">
+              <div class="queued-message-body">
+                <span class="queued-kind">${message.kind === "steer" ? "Steer" : "Follow-up"}</span>
+                <formatted-text .text=${message.text}></formatted-text>
+              </div>
+            </li>
+          `)}
+        </ol>
       </aside>
     `;
   }
