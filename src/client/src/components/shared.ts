@@ -84,8 +84,15 @@ export interface CompletionItem {
 }
 
 export const appStyles = css`
-  /* Mobile browsers already subtract browser controls from 100dvh; reserve bottom safe area only in standalone PWA modes. */
-  :host { --pi-app-safe-area-bottom: 0px; position: fixed; top: 0; right: 0; left: 0; display: block; height: 100dvh; box-sizing: border-box; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--pi-app-safe-area-bottom) env(safe-area-inset-left); color: var(--pi-text); background: var(--pi-bg); font: 14px var(--pi-control-font-family, system-ui, sans-serif); }
+  /* Safe areas: the root shell owns the insets so their background always matches
+     the app background (var(--pi-bg), which follows the active theme).
+     - Top/left/right: env() directly (viewport-fit=cover gives real values in
+       WKWebView shells and Safari; iOS standalone PWAs drop cover via
+       configureIosSafeAreaViewport() and iOS auto-insets the top itself).
+     - Bottom: env(), but at least the --pi-ios-safe-area-bottom fallback (34px)
+       that configureIosSafeAreaViewport() sets on iOS standalone PWAs where
+       env(safe-area-inset-bottom) can resolve to 0 (WebKit bug 317153). */
+  :host { --pi-app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--pi-ios-safe-area-bottom, 0px)); position: fixed; top: 0; right: 0; left: 0; display: block; height: 100dvh; box-sizing: border-box; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--pi-app-safe-area-bottom) env(safe-area-inset-left); color: var(--pi-text); background: var(--pi-bg); font: 14px var(--pi-control-font-family, system-ui, sans-serif); }
   @media (max-width: 520px) {
     chat-view { --pi-content-font-size: 16px; --pi-content-line-height: 1.7; --pi-content-code-font-size: 14px; }
   }
@@ -94,10 +101,6 @@ export const appStyles = css`
   }
   @media (min-width: 761px) {
     :host { --pi-content-font-family: "Oxanium", "LXGW WenKai Screen", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; --pi-content-font-size: 16px; --pi-content-font-weight: 500; --pi-content-line-height: 1.75; --pi-content-block-gap: .75em; --pi-content-message-gap: 24px; --pi-content-code-font-family: var(--pi-control-monospace-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); --pi-content-code-font-size: 14px; --pi-content-code-font-weight: 400; --pi-content-code-line-height: 1.6; }
-  }
-  :host([pwa-display-mode]) { --pi-app-safe-area-bottom: env(safe-area-inset-bottom); }
-  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
-    :host { --pi-app-safe-area-bottom: env(safe-area-inset-bottom); }
   }
   .shell { --navigation-panel-size: clamp(248px, 19vw, 288px); --workspace-panel-size: clamp(340px, 29vw, 440px); --panel-gutter-size: 1px; --navigation-panel-width: var(--navigation-panel-size); --workspace-panel-width: var(--workspace-panel-size); display: grid; grid-template-columns: var(--navigation-panel-width) var(--panel-gutter-size) minmax(360px, 1fr) var(--panel-gutter-size) var(--workspace-panel-width); height: 100%; min-height: 0; }
   aside { grid-column: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
@@ -404,7 +407,7 @@ export const chatStyles = css`
   .group-body { padding: 0 18px 16px; }
   .chat-image { display: block; max-width: 100%; max-height: 320px; margin: 8px 0 0; border: 1px solid var(--pi-border-muted); border-radius: 8px; object-fit: contain; cursor: zoom-in; }
   .chat-image:focus-visible { outline: 2px solid var(--pi-accent, var(--pi-success-border)); outline-offset: 2px; }
-  dialog.image-zoom { position: fixed; inset: 0; margin: auto; max-width: calc(96vw - env(safe-area-inset-left) - env(safe-area-inset-right)); max-height: calc(96vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); width: fit-content; height: fit-content; padding: 0; border: none; background: transparent; overflow: visible; }
+  dialog.image-zoom { position: fixed; inset: 0; margin: auto; max-width: calc(96vw - env(safe-area-inset-left) - env(safe-area-inset-right)); max-height: calc(96vh - var(--pi-app-safe-area-bottom)); max-height: calc(96dvh - var(--pi-app-safe-area-bottom)); width: fit-content; height: fit-content; padding: 0; border: none; background: transparent; overflow: visible; }
   dialog.image-zoom[open] { display: flex; }
   dialog.image-zoom::backdrop { background: rgba(0, 0, 0, 0.8); }
   .image-zoom-full { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 8px; object-fit: contain; cursor: zoom-out; }

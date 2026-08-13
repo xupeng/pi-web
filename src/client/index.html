@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>PI WEB</title>
     <meta name="theme-color" content="#0d1117" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
@@ -100,6 +102,11 @@
       }
       html, body { margin: 0; height: 100%; overflow: hidden; background: var(--pi-bg); color: var(--pi-text); }
       body { min-height: 100dvh; }
+      /* Set by configureIosSafeAreaViewport() for iOS standalone PWAs, where
+         WebKit's env(safe-area-inset-*) is unreliable (bugs 313800/317153):
+         the app drops viewport-fit=cover and pads the bottom with a fixed
+         fallback instead. */
+      body.ios-pwa-no-cover { --pi-ios-safe-area-bottom: 34px; }
     </style>
   </head>
   <body>
