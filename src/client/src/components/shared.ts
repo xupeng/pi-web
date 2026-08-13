@@ -483,7 +483,7 @@ export const chatStyles = css`
   .part > formatted-text { display: block; max-width: 100%; min-width: 0; overflow: visible; }
   .skill-invocation, .skill-read { border: 1px solid var(--pi-border); border-radius: 8px; background: var(--pi-surface); padding: 8px 10px; }
   .skill-invocation > summary, .skill-read > strong { color: var(--pi-purple); }
-  .skill-invocation > small, .skill-read > small { display: block; margin: 6px 0 0; color: var(--pi-muted); }
+  .skill-invocation > small, .skill-read > small { display: block; margin: 6px 0 0; color: var(--pi-muted); overflow-wrap: anywhere; }
   summary { cursor: pointer; color: var(--pi-muted); }
   pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; direction: ltr; text-align: left; unicode-bidi: isolate; }
   .shell-output { color: var(--pi-text); font-family: var(--pi-content-code-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: var(--pi-content-code-font-size, 13px); font-weight: var(--pi-content-code-font-weight, 400); line-height: var(--pi-content-code-line-height, 1.45); direction: ltr; text-align: left; unicode-bidi: isolate; }

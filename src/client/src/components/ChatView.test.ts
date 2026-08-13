@@ -6,7 +6,7 @@ import {
   notificationTrayIsCollapsed,
   type SelectedSessionNotificationView,
 } from "../sessionNotifications";
-import type { ChatLine } from "./shared";
+import { chatStyles, type ChatLine } from "./shared";
 import {
   ChatView,
   chatEventAnchorKey,
@@ -21,6 +21,14 @@ import {
   chatSessionWarningRows,
 } from "./ChatView";
 import { templateEventHandlerAfterMarker, templateEventHandlerNearMarker } from "../templateInspection.testSupport";
+
+describe("chatStyles skill metadata containment", () => {
+  it("wraps unbroken skill locations and paths inside their message card", () => {
+    expect(chatStyles.cssText).toMatch(
+      /\.skill-invocation > small,\s*\.skill-read > small\s*\{[^}]*overflow-wrap:\s*anywhere;/u,
+    );
+  });
+});
 
 describe("chatQueuedMessageSections", () => {
   it("labels client-side pending-start sends separately from server queued messages", () => {
