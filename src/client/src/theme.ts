@@ -116,6 +116,16 @@ export function findThemePairForTheme(themePairs: readonly QualifiedThemePairCon
   return themePairs.find((pair) => pair.light === themeId || pair.dark === themeId);
 }
 
+/**
+ * Label for a theme option in the Select Theme picker. Only the currently
+ * applied theme is marked ("✓ current"); the stored selection is intentionally
+ * not surfaced separately, so the picker never shows two checkmarks whose
+ * meanings (chosen vs. applied) compete with each other.
+ */
+export function themePickerOptionLabel(theme: QualifiedThemeContribution, activeThemeId: QualifiedContributionId | undefined): string {
+  return theme.id === activeThemeId ? `${theme.name} ✓ current` : theme.name;
+}
+
 function parseThemePreference(value: string): ThemePreference | undefined {
   const trimmed = value.trim();
   if (trimmed === "") return undefined;

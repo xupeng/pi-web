@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLASSIC_THEME_ID, DEFAULT_THEME_PREFERENCE, findThemePairForTheme, resolveThemePreference } from "./theme";
+import { CLASSIC_THEME_ID, DEFAULT_THEME_PREFERENCE, findThemePairForTheme, resolveThemePreference, themePickerOptionLabel } from "./theme";
 import type { QualifiedContributionId, QualifiedThemeContribution, QualifiedThemePairContribution, ThemeColorScheme, ThemeTokens } from "./plugins/types";
 
 const tokens = {
@@ -113,6 +113,20 @@ describe("resolveThemePreference", () => {
   it("can look up a pair from either member theme", () => {
     expect(findThemePairForTheme(themePairs, "themes:pi-web-light")?.id).toBe("themes:pi-web");
     expect(findThemePairForTheme(themePairs, "themes:pi-web-dark")?.id).toBe("themes:pi-web");
+  });
+});
+
+describe("themePickerOptionLabel", () => {
+  const piWebDark = theme("pi-web-dark", "PI WEB Dark", "dark");
+  const piWebLight = theme("pi-web-light", "PI WEB Light", "light");
+
+  it("marks only the applied theme as current", () => {
+    expect(themePickerOptionLabel(piWebLight, "themes:pi-web-light")).toBe("PI WEB Light ✓ current");
+    expect(themePickerOptionLabel(piWebDark, "themes:pi-web-light")).toBe("PI WEB Dark");
+  });
+
+  it("leaves all options unmarked when no applied theme is known", () => {
+    expect(themePickerOptionLabel(piWebDark, undefined)).toBe("PI WEB Dark");
   });
 });
 

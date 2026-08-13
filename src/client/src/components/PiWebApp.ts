@@ -28,7 +28,7 @@ import { SessionUnreadController } from "../sessionUnread";
 import { initialSessionWarningVisibilityState, reconcileSessionWarningVisibility, toggleSessionWarnings } from "../sessionWarningVisibility";
 import { RealtimeSocket, type BrowserRealtimeEvent } from "../sessionSocket";
 import type { PluginMachine, PluginPromptEditor, QualifiedContributionId, QualifiedThemeContribution, QualifiedThemePairContribution, QualifiedWorkspacePanelContribution, PluginRuntimeContext, TerminalCommandRunsInternalRuntime, WorkspaceFiles, WorkspaceHost, WorkspaceLabelContext, WorkspaceLabelItem, WorkspacePanelContext, WorkspacePluginBinding } from "../plugins/types";
-import { CLASSIC_THEME_ID, DEFAULT_THEME_PREFERENCE, applyPiWebTheme, findThemePairForTheme, readStoredThemePreference, resolveThemePreference, writeStoredThemePreference, type ThemePreference, type ThemePreferenceResolution } from "../theme";
+import { CLASSIC_THEME_ID, DEFAULT_THEME_PREFERENCE, applyPiWebTheme, findThemePairForTheme, readStoredThemePreference, resolveThemePreference, themePickerOptionLabel, writeStoredThemePreference, type ThemePreference, type ThemePreferenceResolution } from "../theme";
 import { corePlugin } from "../plugins/core";
 import { themePackPlugin } from "../plugins/themes";
 import { loadExternalPlugins, type ExternalPluginLoadResult } from "../plugins/external";
@@ -1900,12 +1900,12 @@ export class PiWebApp extends LitElement {
   private openThemeDialog() {
     const themes = this.plugins.getThemes();
     const resolution = this.resolveCurrentThemePreference(themes);
-    const selectedThemeId = resolution.selectedTheme?.id;
+    const activeThemeId = resolution.activeTheme?.id;
     const autoValue = this.themePreference.auto ? THEME_AUTO_OFF_VALUE : THEME_AUTO_ON_VALUE;
     this.setState({
       themeDialog: {
         title: "Select Theme",
-        selectedValue: selectedThemeId === undefined ? autoValue : `${THEME_OPTION_PREFIX}${selectedThemeId}`,
+        selectedValue: activeThemeId === undefined ? autoValue : `${THEME_OPTION_PREFIX}${activeThemeId}`,
         options: [
           {
             value: autoValue,
@@ -1914,7 +1914,7 @@ export class PiWebApp extends LitElement {
           },
           ...themes.map((theme) => ({
             value: `${THEME_OPTION_PREFIX}${theme.id}`,
-            label: this.themeOptionLabel(theme, selectedThemeId),
+            label: themePickerOptionLabel(theme, activeThemeId),
             description: this.themeOptionDescription(theme),
           })),
         ],
@@ -1935,7 +1935,10 @@ export class PiWebApp extends LitElement {
     const themeId = value.slice(THEME_OPTION_PREFIX.length);
     const theme = this.plugins.getThemes().find((candidate) => candidate.id === themeId);
     if (theme === undefined) return;
-    this.themePreference = { themeId: theme.id, auto: this.themePreference.auto };
+    // Picking a concrete theme means "use exactly this theme now": turn the
+    // system light/dark follower off so the pick is applied as-is instead of
+    // resolving through the theme pair to a variant the user did not choose.
+    this.themePreference = { themeId: theme.id, auto: false };
     this.applyPreferredTheme(true);
   }
 
@@ -1965,18 +1968,10 @@ export class PiWebApp extends LitElement {
   }
 
   private autoThemeDescription(resolution: ThemePreferenceResolution): string {
-    if (!this.themePreference.auto) return "Follow the system light/dark preference when the selected theme has a pair.";
-    if (resolution.selectedTheme === undefined) return "Follow the system light/dark preference when the selected theme has a pair.";
-    if (resolution.selectedThemePair === undefined) return "On, but the selected theme has no light/dark pair, so it will stay selected.";
-    return `On · ${resolution.selectedThemePair.name} follows the system ${this.systemPrefersLight() ? "light" : "dark"} preference.`;
-  }
-
-  private themeOptionLabel(theme: QualifiedThemeContribution, selectedThemeId: QualifiedContributionId | undefined): string {
-    const markers = [
-      ...(theme.id === selectedThemeId ? ["selected"] : []),
-      ...(theme.id === this.activeThemeId && theme.id !== selectedThemeId ? ["active"] : []),
-    ];
-    return markers.length === 0 ? theme.name : `${theme.name} ✓ ${markers.join(" · ")}`;
+    if (!this.themePreference.auto) return "Off · the selected theme is used as-is. Tap to follow the system light/dark preference.";
+    if (resolution.selectedTheme === undefined) return "On · follows the system light/dark preference when the selected theme has a pair.";
+    if (resolution.selectedThemePair === undefined) return "On, but the selected theme has no light/dark pair, so it stays as-is.";
+    return `On · ${resolution.selectedThemePair.name} follows the system ${this.systemPrefersLight() ? "light" : "dark"} preference. Pick a theme below to use it directly.`;
   }
 
   private themeOptionDescription(theme: QualifiedThemeContribution): string {
