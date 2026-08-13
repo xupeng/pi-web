@@ -98,7 +98,7 @@ export const appStyles = css`
   aside app-navigation-panel { flex: 1 1 auto; min-height: 0; }
   header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--pi-border); }
   .header-actions { display: flex; align-items: center; gap: 8px; }
-  main { --pi-main-reading-max: 800px; --pi-main-content-max: 960px; --pi-main-padding-inline: clamp(18px, 2.2vw, 32px); grid-column: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  main { --pi-main-reading-max: 920px; --pi-main-content-max: 960px; --pi-main-padding-inline: clamp(18px, 2.2vw, 32px); grid-column: 3; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .context-bar { position: relative; flex: 0 0 auto; min-width: 0; display: none; align-items: center; gap: 0; padding: 6px 0; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
   .context-bar::before, .context-bar::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 2; width: 20px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
   .context-bar::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
@@ -372,8 +372,8 @@ export const chatStyles = css`
   .activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .45; flex: 0 0 auto; }
   .activity-dock.active .dot { animation: pulse 1s ease-in-out infinite; opacity: 1; }
-  .msg { max-width: var(--pi-main-reading-max, 800px); min-width: 0; box-sizing: border-box; margin: 0 0 var(--pi-content-message-gap, 24px); padding: 16px 18px; border: 1px solid var(--pi-border); border-radius: 12px; background: var(--pi-surface); overflow: visible; }
-  .msg:is(.wide, .tool-image-output, .tool-execution-shell, .ask-user-record-shell, .event-group) { max-width: var(--pi-main-content-max, 960px); }
+  .msg { max-width: var(--pi-main-content-max, 960px); min-width: 0; box-sizing: border-box; margin: 0 0 var(--pi-content-message-gap, 24px); padding: 16px 18px; border: 1px solid var(--pi-border); border-radius: 12px; background: var(--pi-surface); overflow: visible; }
+  .msg:not(.wide, .tool-image-output, .tool-execution-shell, .ask-user-record-shell, .event-group) > .part { max-width: var(--pi-main-reading-max, 920px); margin-inline: auto; }
   .msg.assistant, .msg.tool-image-output { background: var(--pi-surface); }
   .msg.user { border-color: var(--pi-accent-border); background: var(--pi-selection-bg); }
   .msg.tool { border-color: var(--pi-warning-border); background: var(--pi-warning-surface); color: var(--pi-warning); }
@@ -382,10 +382,18 @@ export const chatStyles = css`
   .msg.system { color: var(--pi-danger); }
   .msg.bash { border-color: var(--pi-success); background: var(--pi-success-bg); }
   .msg.skill { border-color: var(--pi-purple-border); background: var(--pi-purple-surface); }
-  .msg.event-group { padding: 0; border-color: var(--pi-border); background: var(--pi-bg); color: var(--pi-muted); }
+  .msg.event-group { padding: 0; border-color: var(--pi-border); background: var(--pi-surface); color: var(--pi-muted); }
   .msg.event-group.live { border-color: var(--pi-success-border); background: var(--pi-success-bg); }
-  .msg.event-group > summary { position: sticky; top: var(--pi-chat-sticky-top); z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); color: var(--pi-muted); }
-  .msg.event-group.live > summary { border-bottom-color: var(--pi-success-border); background: var(--pi-success-bg); color: var(--pi-success); }
+  .msg.event-group > summary { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 11px; background: transparent; color: var(--pi-muted); list-style: none; transition: color .12s ease, background .12s ease; }
+  .msg.event-group > summary::-webkit-details-marker { display: none; }
+  .msg.event-group > summary::before { content: ""; flex: 0 0 auto; box-sizing: border-box; width: 8px; height: 8px; margin: 0 3px 0 2px; border: solid var(--pi-muted); border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: border-color .12s ease, transform .12s ease; }
+  .msg.event-group > summary:hover, .msg.event-group > summary:focus-visible { background: var(--pi-surface-hover); color: var(--pi-text-secondary); }
+  .msg.event-group > summary:focus-visible { outline: 2px solid var(--pi-accent); outline-offset: -2px; }
+  .msg.event-group[open] > summary { position: sticky; top: var(--pi-chat-sticky-top); z-index: 5; border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-surface); }
+  .msg.event-group[open] > summary::before { transform: rotate(45deg); }
+  .msg.event-group.live > summary { color: var(--pi-success); }
+  .msg.event-group.live > summary::before { border-color: currentColor; }
+  .msg.event-group.live[open] > summary { border-bottom-color: var(--pi-success-border); background: var(--pi-success-bg); }
   .msg.event-group > summary .label { margin: 0; }
   .group-body { padding: 0 18px 16px; }
   .chat-image { display: block; max-width: 100%; max-height: 320px; margin: 8px 0 0; border: 1px solid var(--pi-border-muted); border-radius: 8px; object-fit: contain; cursor: zoom-in; }
@@ -397,11 +405,16 @@ export const chatStyles = css`
   .image-zoom-close { position: absolute; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; font: 16px/1 var(--pi-control-font-family, system-ui, sans-serif); color: var(--pi-muted); background: color-mix(in srgb, var(--pi-surface) 88%, transparent); border: 1px solid var(--pi-border); border-radius: 6px; cursor: pointer; }
   .image-zoom-close:hover, .image-zoom-close:focus-visible { color: var(--pi-text-bright); border-color: var(--pi-accent); }
   .image-zoom-close:focus-visible { outline: 1px solid var(--pi-border); outline-offset: 2px; }
-  .group-msg { max-width: 100%; min-width: 0; box-sizing: border-box; padding: 14px 0; border-top: 1px solid var(--pi-border-muted); color: var(--pi-text); overflow: visible; }
+  .group-msg { max-width: 100%; min-width: 0; box-sizing: border-box; margin-top: 14px; color: var(--pi-text); overflow: visible; }
   .group-msg.tool { color: var(--pi-warning); }
   .group-msg.tool-execution-shell { color: var(--pi-text); }
   .group-msg.system { color: var(--pi-danger); }
   .group-msg.bash { color: var(--pi-success); }
+  .group-msg:not(.tool-execution-shell) { overflow: hidden; border: 1px solid var(--pi-border); border-radius: 8px; background: var(--pi-bg); padding: 9px; }
+  .group-msg.user { border-color: var(--pi-accent-border); background: var(--pi-selection-bg); }
+  .group-msg.tool { border-color: var(--pi-warning-border); background: var(--pi-warning-surface); }
+  .group-msg.bash { border-color: var(--pi-success-border); background: var(--pi-success-bg); }
+  .group-msg.skill { border-color: var(--pi-purple-border); background: var(--pi-purple-surface); }
   .history-boundary { position: relative; z-index: 5; display: grid; gap: 3px; justify-items: center; margin: 0 0 18px; color: var(--pi-muted); font-size: 12px; text-align: center; }
   .history-load-button { border: 1px solid var(--pi-border); border-radius: 999px; background: var(--pi-surface); color: var(--pi-text-secondary); padding: 5px 12px; font: 12px var(--pi-control-font-family, system-ui, sans-serif); cursor: pointer; }
   .history-load-button:hover, .history-load-button:focus { border-color: var(--pi-accent); color: var(--pi-text-bright); }
@@ -430,7 +443,7 @@ export const chatStyles = css`
   .msg.tool > .msg-header { border-bottom-color: color-mix(in srgb, var(--pi-warning-border) 35%, transparent); background: var(--pi-warning-surface); }
   .msg.bash > .msg-header { border-bottom-color: color-mix(in srgb, var(--pi-success) 35%, transparent); background: var(--pi-success-bg); }
   .msg.skill > .msg-header { border-bottom-color: color-mix(in srgb, var(--pi-purple-border) 35%, transparent); background: var(--pi-purple-surface); }
-  .group-msg > .msg-header { position: sticky; top: var(--pi-chat-sticky-top); z-index: 4; margin: -14px 0 10px; padding: 9px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--pi-border-muted) 35%, transparent); background: var(--pi-bg); }
+  .group-msg > .msg-header { position: static; min-height: 0; margin: 0 0 8px; padding: 0 0 8px; border-bottom: 1px solid var(--pi-border-muted); background: transparent; }
   .msg-header-trailing { min-width: 0; flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
   .msg-actions { flex: 0 0 auto; display: inline-flex; gap: 6px; opacity: 0; transition: opacity .12s ease; }
   .msg-action { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--pi-border); border-radius: 6px; background: var(--pi-surface); color: var(--pi-muted); padding: 0; font: 14px var(--pi-control-font-family, system-ui, sans-serif); line-height: 1; cursor: pointer; }

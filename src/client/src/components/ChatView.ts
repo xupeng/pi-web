@@ -130,13 +130,13 @@ export function chatMessageGroupClassName(defaultOpen: boolean): string {
 }
 
 /** Give structured and intrinsically wide transcript content the wider chat frame. */
-export function chatMessageClassName(message: ChatLine): string {
+export function chatMessageClassName(message: ChatLine, containerClass = "msg"): string {
   const wideRole = message.role === "tool" || message.role === "bash" || message.role === "skill";
   const widePart = message.parts.some((part) => {
     if (part.type === "text") return markdownHasWideBlock(part.text);
     return part.type !== "thinking" && part.type !== "empty";
   });
-  return `msg ${message.role}${wideRole || widePart ? " wide" : ""}`;
+  return `${containerClass} ${message.role}${wideRole || widePart ? " wide" : ""}`;
 }
 
 /** The disclosure summary label for an event group, distinguishing the live tail. */
@@ -888,7 +888,7 @@ export class ChatView extends LitElement {
         ${messages.map((message, offset) => {
           const toolOnly = this.isToolExecutionOnlyMessage(message);
           return html`
-            <section class=${toolOnly ? "group-msg tool-execution-shell" : `group-msg ${message.role}`} data-index=${startIndex + offset} data-scroll-anchor-id=${this.eventAnchorKey(startIndex + offset)}>
+            <section class=${toolOnly ? "group-msg tool-execution-shell" : chatMessageClassName(message, "group-msg")} data-index=${startIndex + offset} data-scroll-anchor-id=${this.eventAnchorKey(startIndex + offset)}>
               ${toolOnly ? null : this.renderMessageHeader(message, `${String(startIndex)}:${String(offset)}`)}
               ${message.parts.map((part) => this.renderPart(part, message))}
             </section>

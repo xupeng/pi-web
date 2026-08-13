@@ -292,6 +292,8 @@ describe("chat event-group content seams", () => {
     expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "| A | B |\n| - | - |\n| 1 | 2 |" }] })).toBe("msg assistant wide");
     expect(chatMessageClassName({ role: "user", parts: [{ type: "image", mimeType: "image/png", data: "QUJD" }] })).toBe("msg user wide");
     expect(chatMessageClassName({ role: "bash", parts: [{ type: "text", text: "done" }] })).toBe("msg bash wide");
+    expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "Nested prose." }] }, "group-msg")).toBe("group-msg assistant");
+    expect(chatMessageClassName({ role: "assistant", parts: [{ type: "text", text: "```ts\nconst wide = true;\n```" }] }, "group-msg")).toBe("group-msg assistant wide");
   });
 });
 
