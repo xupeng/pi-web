@@ -6,7 +6,9 @@ import type { WorkspaceLabelItem } from "../../plugins/types";
 import { selectedMachineId } from "../../controllers/types";
 import type { NavigationSection } from "../../appShell/navigationState";
 import { NAVIGATION_SECTION_ORDER } from "../../appShell/navigationState";
+import { isNavigationSortMode, navigationSortModeLabel, navigationSortModesForSection, type NavigationSortMode, type NavigationSortSection } from "../../navigationSorting";
 import type { KeyboardNavigableSection } from "../navigationFocus";
+import type { SortMenuOption } from "../SortMenuButton";
 import "../MachineList";
 import "../MachineSwitcher";
 import "../ProjectList";
@@ -14,6 +16,10 @@ import "../WorkspaceList";
 import "../SessionList";
 
 export type NavigationFocusTarget = NavigationSection | "chat";
+
+function navigationSortOptions(section: NavigationSortSection): SortMenuOption[] {
+  return navigationSortModesForSection(section).map((mode) => ({ value: mode, label: navigationSortModeLabel(mode) }));
+}
 
 @customElement("app-navigation-panel")
 export class AppNavigationPanel extends LitElement {
@@ -40,6 +46,9 @@ export class AppNavigationPanel extends LitElement {
   @property({ type: Boolean }) projectsCollapsed = false;
   @property({ type: Boolean }) workspacesCollapsed = false;
   @property({ type: Boolean }) sessionsCollapsed = false;
+  @property({ attribute: false }) projectSortMode: NavigationSortMode = "activity";
+  @property({ attribute: false }) workspaceSortMode: NavigationSortMode = "activity";
+  @property({ attribute: false }) sessionSortMode: NavigationSortMode = "activity";
   @property({ type: Number }) startingSessionCount = 0;
   @property({ type: Boolean }) canStartSession = false;
   @property({ attribute: false }) onShowActions?: () => void;
@@ -70,6 +79,7 @@ export class AppNavigationPanel extends LitElement {
   @property({ attribute: false }) onRemoveMachine?: (machine: Machine) => void | Promise<void>;
   @property({ attribute: false }) onFocusNavigationTarget?: (target: NavigationFocusTarget) => void | Promise<void>;
   @property({ attribute: false }) onCancelKeyboardNavigation?: () => void | Promise<void>;
+  @property({ attribute: false }) onSortModeChange?: (section: NavigationSortSection, mode: NavigationSortMode) => void;
 
   @query("machine-list") private machineList?: KeyboardNavigableSection;
   @query("machine-switcher") private machineSwitcher?: KeyboardNavigableSection;
@@ -126,6 +136,12 @@ export class AppNavigationPanel extends LitElement {
       <project-list
         .projects=${this.projects}
         .selected=${this.selectedProject}
+        .sortMode=${this.projectSortMode}
+        .sortOptions=${navigationSortOptions("projects")}
+        .onSortModeChange=${(mode: string) => {
+          if (!isNavigationSortMode(mode)) return;
+          this.onSortModeChange?.("projects", mode);
+        }}
         .statusSnapshot=${this.selectedMachineStatusSnapshot()}
         .collapsible=${this.collapsible}
         .collapsed=${this.projectsCollapsed}
@@ -139,6 +155,12 @@ export class AppNavigationPanel extends LitElement {
       <workspace-list
         .workspaces=${this.workspaces}
         .selected=${this.selectedWorkspace}
+        .sortMode=${this.workspaceSortMode}
+        .sortOptions=${navigationSortOptions("workspaces")}
+        .onSortModeChange=${(mode: string) => {
+          if (!isNavigationSortMode(mode)) return;
+          this.onSortModeChange?.("workspaces", mode);
+        }}
         .statusSnapshot=${this.selectedMachineStatusSnapshot()}
         .deletingWorkspaceIds=${this.deletingWorkspaceIds}
         .collapsible=${this.collapsible}
@@ -153,6 +175,12 @@ export class AppNavigationPanel extends LitElement {
       ></workspace-list>
       <session-list
         .sessions=${this.sessions}
+        .sortMode=${this.sessionSortMode}
+        .sortOptions=${navigationSortOptions("sessions")}
+        .onSortModeChange=${(mode: string) => {
+          if (!isNavigationSortMode(mode)) return;
+          this.onSortModeChange?.("sessions", mode);
+        }}
         .statuses=${this.sessionStatuses}
         .activities=${this.sessionActivities}
         .sending=${this.sendingPrompts}

@@ -7,6 +7,8 @@ import { hasStatusUnread, renderActionActivityIndicator, statusActivityKind } fr
 import type { KeyboardNavigableSection } from "./navigationFocus";
 import { activateSelectableRow, focusSelectedOrFirstSelectableRow, handleSelectableRowKeyboard } from "./selectableRow";
 import { listStyles } from "./shared";
+import { type SortMenuOption } from "./SortMenuButton";
+import "./SortMenuButton";
 
 @customElement("project-list")
 export class ProjectList extends LitElement implements KeyboardNavigableSection {
@@ -22,6 +24,9 @@ export class ProjectList extends LitElement implements KeyboardNavigableSection 
   @property({ attribute: false }) onFocusPreviousSection?: () => void | Promise<void>;
   @property({ attribute: false }) onFocusNextSection?: () => void | Promise<void>;
   @property({ attribute: false }) onCancelKeyboardNavigation?: () => void | Promise<void>;
+  @property({ attribute: false }) sortMode?: string;
+  @property({ attribute: false }) sortOptions: SortMenuOption[] = [];
+  @property({ attribute: false }) onSortModeChange?: (mode: string) => void;
   @state() private openMenuProjectId: string | undefined;
   @state() private menuStyle = "";
   private readonly onDocumentClick = (event: MouseEvent) => {
@@ -93,10 +98,22 @@ export class ProjectList extends LitElement implements KeyboardNavigableSection 
   }
 
   private renderHeading() {
-    if (!this.collapsible) return html`<span>Projects</span>`;
     const selectedSummary = this.selected?.name ?? "No project selected";
     const selectedTitle = this.selected?.path ?? selectedSummary;
-    return html`<button class="section-toggle" aria-expanded=${String(!this.collapsed)} @click=${() => { this.onToggleCollapsed?.(); }}><span class="section-title"><span class="section-name">${this.collapsed ? "▸" : "▾"} Projects</span>${this.collapsed ? html`<small class="section-selected" title=${selectedTitle}>${selectedSummary}</small>` : null}</span><small class="section-count">${this.projects.length}</small></button>`;
+    const toggle = this.collapsible
+      ? html`<button class="section-toggle" aria-expanded=${String(!this.collapsed)} @click=${() => { this.onToggleCollapsed?.(); }}><span class="section-title"><span class="section-name">${this.collapsed ? "▸" : "▾"} Projects</span>${this.collapsed ? html`<small class="section-selected" title=${selectedTitle}>${selectedSummary}</small>` : null}</span><small class="section-count">${this.projects.length}</small></button>`
+      : html`<span>Projects</span>`;
+    return html`${toggle}${this.renderSortControl()}`;
+  }
+
+  private renderSortControl() {
+    if (this.sortOptions.length === 0) return null;
+    return html`<sort-menu-button
+      .label=${"Sort projects"}
+      .options=${this.sortOptions}
+      .selected=${this.sortMode}
+      .onSelect=${(mode: string) => { this.onSortModeChange?.(mode); }}
+    ></sort-menu-button>`;
   }
 
   private renderActivity(project: Project) {

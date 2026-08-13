@@ -1,6 +1,8 @@
 import type { AuthProviderOption, CommandOption, CommandResult, ExtensionDialogAnswer, ExtensionDialogCloseReason, FileContentResponse, FileTreeEntry, Machine, MachineHealth, MachineRuntime, OAuthFlowState, PendingAskUser, PendingExtensionDialog, PiWebStatusResponse, Project, QueuedSessionMessage, SessionActivity, SessionInfo, SessionStatus, SessionTreeSnapshot, TerminalCommandRun, Workspace } from "./api";
 import type { ChatLine } from "./components/shared";
 import type { MachineStatusSnapshot } from "../../shared/machineStatus";
+import type { NavigationSortModes } from "./navigationSorting";
+import { DEFAULT_NAVIGATION_SORT_MODES } from "./navigationSorting";
 import type { QualifiedContributionId } from "./plugins/ids";
 import type { SelectedSessionNotificationInbox } from "./sessionNotifications";
 import type { WorkspaceUploadBatchState } from "./workspaceUploadState";
@@ -61,6 +63,10 @@ export interface AppState {
   /** Authoritative projection plus browser-local optimistic overlays for the selected inbox. */
   selectedNotificationInbox: SelectedSessionNotificationInbox | undefined;
   workspacesByProjectId: Record<string, Workspace[]>;
+  /** Per-section sort choice, adopted from per-machine stored preferences. */
+  navigationSortModes: NavigationSortModes;
+  /** Latest session activity per workspace cwd, used to order project/workspace lists. */
+  workspaceActivity: Record<string, string>;
   workspaceDeletionRuns: Record<string, TerminalCommandRun>;
   commandDialog: Extract<CommandResult, { type: "select" }> | undefined;
   treeDialog: SessionTreeSnapshot | undefined;
@@ -170,6 +176,8 @@ export function initialAppState(): AppState {
     sessionActivities: {},
     selectedNotificationInbox: undefined,
     workspacesByProjectId: {},
+    navigationSortModes: { ...DEFAULT_NAVIGATION_SORT_MODES },
+    workspaceActivity: {},
     workspaceDeletionRuns: {},
     commandDialog: undefined,
     treeDialog: undefined,

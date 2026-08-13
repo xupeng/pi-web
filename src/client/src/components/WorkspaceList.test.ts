@@ -205,3 +205,53 @@ function unreadDot(row: Element): Element | null {
 function workspace(id: string, patch: Partial<Workspace> = {}): Workspace {
   return { id, projectId: "project-1", path: `/repo/${id}`, label: id, isMain: true, effectiveConfig: {}, ...patch };
 }
+
+describe("workspace-list sort control", () => {
+  it("renders a sort menu in the heading and reports changes", async () => {
+    const list = new WorkspaceList();
+    list.workspaces = [workspace("ws-a")];
+    list.collapsible = true;
+    list.sortMode = "activity";
+    list.sortOptions = [{ value: "activity", label: "Latest activity" }, { value: "name", label: "Name" }];
+    const onSortModeChange = vi.fn();
+    list.onSortModeChange = onSortModeChange;
+    document.body.append(list);
+    await list.updateComplete;
+
+    const sortControl = list.shadowRoot?.querySelector<HTMLElement>("sort-menu-button");
+    const trigger = sortControl?.shadowRoot?.querySelector<HTMLButtonElement>(".sort-menu-toggle");
+    expect(trigger).not.toBeNull();
+    expect(trigger?.getAttribute("aria-label")).toBe("Sort workspaces");
+    trigger?.click();
+    await list.updateComplete;
+
+    const items = sortControl?.shadowRoot?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]');
+    expect(items).toHaveLength(2);
+    items?.[1]?.click();
+    await list.updateComplete;
+    expect(onSortModeChange).toHaveBeenCalledWith("name");
+  });
+
+  it("keeps section collapse working with a sort control present", async () => {
+    const list = new WorkspaceList();
+    list.workspaces = [workspace("ws-a")];
+    list.collapsible = true;
+    list.sortOptions = [{ value: "activity", label: "Latest activity" }];
+    const onToggleCollapsed = vi.fn();
+    list.onToggleCollapsed = onToggleCollapsed;
+    document.body.append(list);
+    await list.updateComplete;
+
+    list.shadowRoot?.querySelector<HTMLButtonElement>(".section-toggle")?.click();
+    await list.updateComplete;
+    expect(onToggleCollapsed).toHaveBeenCalledOnce();
+  });
+
+  it("hides the sort control when no options are offered", async () => {
+    const list = new WorkspaceList();
+    list.workspaces = [workspace("ws-a")];
+    document.body.append(list);
+    await list.updateComplete;
+    expect(list.shadowRoot?.querySelector("sort-menu-button")).toBeNull();
+  });
+});

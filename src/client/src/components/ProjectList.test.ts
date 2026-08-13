@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "../api";
 import type { MachineStatusSnapshot } from "../../../shared/machineStatus";
 import { machineStatusSnapshot } from "../machineStatus.testSupport";
@@ -96,3 +96,58 @@ function unreadDot(row: Element): Element | null {
 function project(id: string): Project {
   return { id, name: id, path: `/repo/${id}`, createdAt: "2026-06-04T00:00:00.000Z" };
 }
+
+describe("project-list sort control", () => {
+  it("renders a sort menu in the heading and reports changes", async () => {
+    const list = new ProjectList();
+    list.projects = [project("project-a")];
+    list.collapsible = true;
+    list.sortMode = "activity";
+    list.sortOptions = [{ value: "activity", label: "Latest activity" }, { value: "name", label: "Name" }];
+    const onSortModeChange = vi.fn();
+    list.onSortModeChange = onSortModeChange;
+    document.body.append(list);
+    await list.updateComplete;
+
+    const sortControl = list.shadowRoot?.querySelector<HTMLElement>("sort-menu-button");
+    expect(sortControl).not.toBeNull();
+    const trigger = sortControl?.shadowRoot?.querySelector<HTMLButtonElement>(".sort-menu-toggle");
+    expect(trigger).not.toBeNull();
+    expect(trigger?.getAttribute("aria-label")).toBe("Sort projects");
+    trigger?.click();
+    await list.updateComplete;
+
+    const items = sortControl?.shadowRoot?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]');
+    expect(items).toHaveLength(2);
+    items?.[1]?.click();
+    await list.updateComplete;
+
+    expect(onSortModeChange).toHaveBeenCalledWith("name");
+  });
+
+  it("keeps section collapse working with a sort control present", async () => {
+    const list = new ProjectList();
+    list.projects = [project("project-a")];
+    list.collapsible = true;
+    list.collapsed = false;
+    list.sortOptions = [{ value: "activity", label: "Latest activity" }];
+    const onToggleCollapsed = vi.fn();
+    list.onToggleCollapsed = onToggleCollapsed;
+    document.body.append(list);
+    await list.updateComplete;
+
+    list.shadowRoot?.querySelector<HTMLButtonElement>(".section-toggle")?.click();
+    await list.updateComplete;
+    expect(onToggleCollapsed).toHaveBeenCalledOnce();
+    // The sort control stays put next to the toggle.
+    expect(list.shadowRoot?.querySelector("sort-menu-button")).not.toBeNull();
+  });
+
+  it("hides the sort control when no options are offered", async () => {
+    const list = new ProjectList();
+    list.projects = [project("project-a")];
+    document.body.append(list);
+    await list.updateComplete;
+    expect(list.shadowRoot?.querySelector(".sort-menu-toggle")).toBeNull();
+  });
+});

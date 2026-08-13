@@ -76,6 +76,8 @@ import "./appShell/AppRefreshControl";
 import { errorBanner } from "./errorBanner";
 import { deprecatedAgentInputsBanner, deprecatedAgentInputsWarnings } from "./deprecatedAgentInputsBanner";
 import { appStyles } from "./shared";
+import { NavigationSortController } from "../controllers/navigationSortController";
+import type { NavigationSortMode, NavigationSortSection } from "../navigationSorting";
 
 
 const PI_WEB_STATUS_REFRESH_MS = 15 * 60 * 1000;
@@ -125,6 +127,11 @@ export class PiWebApp extends LitElement {
   private readyChatIdentity: string | undefined;
 
   private readonly notifications = new SessionNotificationController(
+    () => this.state,
+    (patch) => { this.setState(patch); },
+    { onBackgroundError: (message, error) => { console.warn(message, error); } },
+  );
+  private readonly navigationSorting = new NavigationSortController(
     () => this.state,
     (patch) => { this.setState(patch); },
     { onBackgroundError: (message, error) => { console.warn(message, error); } },
@@ -258,6 +265,7 @@ export class PiWebApp extends LitElement {
   protected override willUpdate(): void {
     this.toggleAttribute("pwa-display-mode", this.appShell.isPwaDisplayMode);
     this.syncSessionWarningVisibility();
+    this.navigationSorting.sync(this.state);
   }
 
   protected override updated(): void {
@@ -1202,12 +1210,16 @@ export class PiWebApp extends LitElement {
         .onToggleMachines=${() => { this.navigationSections.toggle("machines"); }}
         .onSelectMachine=${(machine: Machine) => this.selectNavigationItem("machines", "projects", () => this.selectMachineWithMemory(machine))}
         .onRemoveMachine=${(machine: Machine) => { void this.removeMachine(machine); }}
-        .projects=${this.state.projects}
+        .projects=${this.navigationSorting.sortedProjects(this.state)}
         .selectedProject=${this.state.selectedProject}
-        .workspaces=${this.state.workspaces}
+        .workspaces=${this.navigationSorting.sortedWorkspaces(this.state)}
         .selectedWorkspace=${this.state.selectedWorkspace}
         .deletingWorkspaceIds=${pendingWorkspaceDeletionIds(this.state.workspaceDeletionRuns)}
-        .sessions=${this.state.sessions}
+        .sessions=${this.navigationSorting.sortedSessions(this.state)}
+        .projectSortMode=${this.state.navigationSortModes.projects}
+        .workspaceSortMode=${this.state.navigationSortModes.workspaces}
+        .sessionSortMode=${this.state.navigationSortModes.sessions}
+        .onSortModeChange=${(section: NavigationSortSection, mode: NavigationSortMode) => { this.navigationSorting.setSortMode(section, mode); }}
         .sessionStatuses=${this.state.sessionStatuses}
         .sessionActivities=${this.state.sessionActivities}
         .sendingPrompts=${this.state.sendingPrompts}

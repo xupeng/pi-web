@@ -11,6 +11,8 @@ import { renderActionActivityIndicator, type ActivityIndicatorKind } from "./act
 import type { KeyboardNavigableSection } from "./navigationFocus";
 import { activateSelectableRow, focusSelectedOrFirstSelectableRow, handleSelectableRowKeyboard } from "./selectableRow";
 import { listStyles } from "./shared";
+import { type SortMenuOption } from "./SortMenuButton";
+import "./SortMenuButton";
 
 /**
  * An orphan row is a session whose recorded parent is not in this listing.
@@ -64,6 +66,9 @@ export class SessionList extends LitElement implements KeyboardNavigableSection 
   @property({ attribute: false }) onMarkReadMany?: (sessions: SessionInfo[]) => void | Promise<void>;
   @property({ attribute: false }) onReload?: (session: SessionInfo) => void;
   @property({ attribute: false }) onCleanup?: () => void;
+  @property({ attribute: false }) sortMode?: string;
+  @property({ attribute: false }) sortOptions: SortMenuOption[] = [];
+  @property({ attribute: false }) onSortModeChange?: (mode: string) => void;
 
   @state() private openMenuSessionId: string | undefined;
   @state() private menuStyle = "";
@@ -161,6 +166,7 @@ export class SessionList extends LitElement implements KeyboardNavigableSection 
           ${this.renderUnreadCount(unreadCount)}
           ${this.renderCleanupButton()}
           ${this.renderStartButton()}
+          ${this.renderSortControl()}
         </h2>
       `;
     }
@@ -174,8 +180,19 @@ export class SessionList extends LitElement implements KeyboardNavigableSection 
         <small class="section-count">${sessionCount}</small>
         ${this.renderCleanupButton()}
         ${this.renderStartButton()}
+        ${this.renderSortControl()}
       </h2>
     `;
+  }
+
+  private renderSortControl() {
+    if (this.sortOptions.length === 0) return null;
+    return html`<sort-menu-button
+      .label=${"Sort sessions"}
+      .options=${this.sortOptions}
+      .selected=${this.sortMode}
+      .onSelect=${(mode: string) => { this.onSortModeChange?.(mode); }}
+    ></sort-menu-button>`;
   }
 
   private renderUnreadCount(unreadCount: number) {
