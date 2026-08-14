@@ -44,6 +44,7 @@ import type {
   ExtensionDialogCloseResponse,
   ExtensionDialogKind,
   ExtensionDialogOutcome,
+  PromptImageAttachment,
   SavedPromptAttachment,
   SessionBulkArchiveResponse,
   SessionBulkDeleteArchivedResponse,
@@ -1995,7 +1996,8 @@ export class PiSessionService implements SessionRouteService {
     const parsedAttachments = parsePromptAttachments(attachments, { enforceInlineSizeLimit: false });
     const images = (await attachmentsToInlineImages(parsedAttachments)).map((entry) => entry.image);
     await this.assertWritable(ref);
-    const session = await this.getOrOpen(ref);
+    const active = await this.getActive(ref);
+    const session = active.runtime.session;
     this.assertTreeNavigationInactive(session, "send a prompt");
     this.maybeGenerateSessionName(session, promptText);
     const isQueued = session.isStreaming || session.isCompacting;
@@ -2014,20 +2016,39 @@ export class PiSessionService implements SessionRouteService {
       this.enqueuePromptDuringCompaction(session, promptText, behavior ?? "followUp", images, echoUserMessage);
       return;
     }
-    void this.submitPrompt(session, promptText, behavior, images, echoUserMessage);
+    void this.submitPrompt(session, promptText, behavior, images, echoUserMessage, await this.modelBoundPromptText(active.runtime.cwd, session, promptText, parsedAttachments));
   }
 
-  private submitPrompt(session: PiAgentSession, text: string, behavior: QueuedPromptKind | undefined, images: ImageContent[] = [], echoUserMessage = true): Promise<void> {
+  private submitPrompt(session: PiAgentSession, text: string, behavior: QueuedPromptKind | undefined, images: ImageContent[] = [], echoUserMessage = true, modelText?: string): Promise<void> {
     this.publishActivity(session, behavior === "steer" ? "steering queued" : behavior === "followUp" ? "message queued" : "prompt accepted", "active");
     if (behavior === undefined && echoUserMessage) this.events.publish(session.sessionId, { type: "message.append", message: userMessage(text, images) });
     const promptOptions = buildPromptOptions(behavior, images);
-    const promptPromise = this.runSessionEntryMutation(session, "send a prompt", () => session.prompt(text, promptOptions)).catch((error: unknown) => {
+    const promptPromise = this.runSessionEntryMutation(session, "send a prompt", () => session.prompt(modelText ?? text, promptOptions)).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       this.publishActivity(session, "error", "error", message);
       this.events.publish(session.sessionId, { type: "session.error", message });
     });
     void promptPromise;
     return promptPromise;
+  }
+
+  /**
+   * When the session model cannot view images inline, pi drops the image blocks
+   * from the message before it reaches the model. Save the attachments to the
+   * workspace and append a note with their relative paths so the model can read
+   * them with a local tool (e.g. an `analyze_image` extension). Saving failures
+   * must never block the prompt: fall back to the plain text and keep sending.
+   */
+  private async modelBoundPromptText(cwd: string, session: PiAgentSession, text: string, attachments: PromptImageAttachment[]): Promise<string | undefined> {
+    if (modelSupportsImages(session.model) || attachments.length === 0) return undefined;
+    try {
+      const saved = await saveAttachmentsToWorkspace(cwd, attachments);
+      if (saved.length === 0) return undefined;
+      return `${text}\n\n${imagePathNote(saved.map((entry) => entry.path))}`;
+    } catch (error: unknown) {
+      console.warn("[pi-web] failed to save prompt attachments for non-vision model:", error);
+      return undefined;
+    }
   }
 
   private enqueuePromptDuringCompaction(session: PiAgentSession, text: string, kind: QueuedPromptKind, images: ImageContent[] = [], echoUserMessage = true): void {
@@ -4118,6 +4139,24 @@ function buildPromptOptions(behavior: QueuedPromptKind | undefined, images: Imag
   if (behavior !== undefined) options.streamingBehavior = behavior;
   if (images.length > 0) options.images = images;
   return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/** Whether the session model can consume inline image content. Undefined (no model yet) is treated as vision-capable. */
+function modelSupportsImages(model: AgentModel | undefined): boolean {
+  return model?.input.includes("image") ?? true;
+}
+
+/**
+ * Note appended to the model-bound prompt text when the session model cannot
+ * view images: the attachments were saved to the workspace, and the model is
+ * pointed at their relative paths so it can read them with a local tool (e.g.
+ * an `analyze_image` extension). Written in English, mirroring pi's own
+ * `(image omitted: ...)` placeholder wording.
+ */
+function imagePathNote(paths: readonly string[]): string {
+  const list = paths.map((path) => `  ${path}`).join("\n");
+  const count = String(paths.length);
+  return `[The user attached ${paths.length === 1 ? "an image" : `${count} images`} that this model cannot view directly. The image content was omitted from the message. The attachment(s) were saved to the workspace and can be read with a local file tool (e.g. analyze_image):\n${list}\nUse that tool on each path to see the image content.]`;
 }
 
 function stringValue(value: unknown): string {
