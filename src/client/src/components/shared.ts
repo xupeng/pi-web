@@ -94,7 +94,7 @@ export const appStyles = css`
        env(safe-area-inset-bottom) can resolve to 0 (WebKit bug 317153). */
   :host { --pi-app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--pi-ios-safe-area-bottom, 0px)); position: fixed; top: 0; right: 0; left: 0; display: block; height: 100dvh; box-sizing: border-box; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--pi-app-safe-area-bottom) env(safe-area-inset-left); color: var(--pi-text); background: var(--pi-bg); font: 14px var(--pi-control-font-family, system-ui, sans-serif); }
   @media (max-width: 520px) {
-    chat-view { --pi-content-font-size: 16px; --pi-content-line-height: 1.7; --pi-content-code-font-size: 14px; }
+    chat-view { --pi-content-font-size: 15px; --pi-content-line-height: 1.7; --pi-content-code-font-size: 14px; }
   }
   @media (min-width: 521px) and (max-width: 760px) {
     chat-view { --pi-content-font-size: 17px; --pi-content-line-height: 1.7; --pi-content-code-font-size: 14px; }
