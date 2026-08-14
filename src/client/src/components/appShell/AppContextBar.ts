@@ -45,36 +45,38 @@ export class AppContextBar extends LitElement {
     const sessionLabel = sessionContextLabel(this.session);
     return html`
       <nav class=${this.contextBarClass()} aria-label="Current location">
-        <span class="context-bar-label">Location</span>
-        <ol class="context-items" @scroll=${this.onContextScroll}>
-          ${showMachineContext ? html`
+        <div class="context-bar-inner">
+          <span class="context-bar-label">Location</span>
+          <ol class="context-items" @scroll=${this.onContextScroll}>
+            ${showMachineContext ? html`
+              <li class="context-item">
+                <button type="button" class=${this.machine === undefined ? "context-chip empty" : "context-chip"} title=${machineContextTitle(this.machine)} aria-label=${`Machine: ${machineLabel}. Open machine selection.`} @click=${() => { this.onOpenSection?.("machines"); }}>
+                  <span class="context-kind">Machine</span>
+                  <span class="context-value">${machineLabel}</span>
+                </button>
+              </li>
+            ` : null}
             <li class="context-item">
-              <button type="button" class=${this.machine === undefined ? "context-chip empty" : "context-chip"} title=${machineContextTitle(this.machine)} aria-label=${`Machine: ${machineLabel}. Open machine selection.`} @click=${() => { this.onOpenSection?.("machines"); }}>
-                <span class="context-kind">Machine</span>
-                <span class="context-value">${machineLabel}</span>
+              <button type="button" class=${this.project === undefined ? "context-chip empty" : "context-chip"} title=${projectContextTitle(this.project)} aria-label=${`Project: ${projectLabel}. Open project selection.`} @click=${() => { this.onOpenSection?.("projects"); }}>
+                <span class="context-kind">Project</span>
+                <span class="context-value">${projectLabel}</span>
               </button>
             </li>
-          ` : null}
-          <li class="context-item">
-            <button type="button" class=${this.project === undefined ? "context-chip empty" : "context-chip"} title=${projectContextTitle(this.project)} aria-label=${`Project: ${projectLabel}. Open project selection.`} @click=${() => { this.onOpenSection?.("projects"); }}>
-              <span class="context-kind">Project</span>
-              <span class="context-value">${projectLabel}</span>
-            </button>
-          </li>
-          <li class="context-item">
-            <button type="button" class=${this.workspace === undefined ? "context-chip empty" : "context-chip"} title=${workspaceContextTitle(this.workspace)} aria-label=${`Workspace: ${workspaceLabel}. Open workspace selection.`} @click=${() => { this.onOpenSection?.("workspaces"); }}>
-              <span class="context-kind">Workspace</span>
-              <span class="context-value">${workspaceLabel}</span>
-            </button>
-          </li>
-          <li class="context-item">
-            <button type="button" class=${this.session === undefined ? "context-chip empty" : "context-chip"} title=${sessionContextTitle(this.session)} aria-label=${`Session: ${sessionLabel}. Open session selection.`} @click=${() => { this.onOpenSection?.("sessions"); }}>
-              <span class="context-kind">Session</span>
-              <span class="context-value">${sessionLabel}</span>
-            </button>
-          </li>
-        </ol>
-        ${this.hasContextActions() ? html`<div class="context-actions">${this.renderActionsButton()}${this.refreshControl}</div>` : null}
+            <li class="context-item">
+              <button type="button" class=${this.workspace === undefined ? "context-chip empty" : "context-chip"} title=${workspaceContextTitle(this.workspace)} aria-label=${`Workspace: ${workspaceLabel}. Open workspace selection.`} @click=${() => { this.onOpenSection?.("workspaces"); }}>
+                <span class="context-kind">Workspace</span>
+                <span class="context-value">${workspaceLabel}</span>
+              </button>
+            </li>
+            <li class="context-item">
+              <button type="button" class=${this.session === undefined ? "context-chip empty" : "context-chip"} title=${sessionContextTitle(this.session)} aria-label=${`Session: ${sessionLabel}. Open session selection.`} @click=${() => { this.onOpenSection?.("sessions"); }}>
+                <span class="context-kind">Session</span>
+                <span class="context-value">${sessionLabel}</span>
+              </button>
+            </li>
+          </ol>
+          ${this.hasContextActions() ? html`<div class="context-actions">${this.renderActionsButton()}${this.refreshControl}</div>` : null}
+        </div>
       </nav>
     `;
   }
@@ -137,13 +139,14 @@ export class AppContextBar extends LitElement {
   static override styles = css`
     /* Keep the refresh menu in this shadow tree above the following mobile tab strip. */
     :host { position: relative; z-index: 20; flex: 0 0 auto; min-width: 0; }
-    .context-bar { position: relative; flex: 0 0 auto; min-width: 0; display: flex; align-items: center; gap: 0; padding: 6px 0; border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
-    .context-bar::before, .context-bar::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 2; width: 20px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
-    .context-bar::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
-    .context-bar::after { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
-    .context-bar.can-scroll-left::before, .context-bar.can-scroll-right::after { opacity: 1; }
+    .context-bar { position: relative; flex: 0 0 auto; min-width: 0; display: flex; align-items: center; gap: 0; padding: 6px var(--pi-main-padding-inline, 18px); border-bottom: 1px solid var(--pi-border-muted); background: var(--pi-bg); }
+    .context-bar-inner { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; width: 100%; max-width: var(--pi-main-content-max, 960px); margin-inline: auto; box-sizing: border-box; }
+    .context-bar-inner::before, .context-bar-inner::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 2; width: 20px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+    .context-bar-inner::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
+    .context-bar-inner::after { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--pi-shadow-strong) 55%, transparent) 0%, transparent 100%); }
+    .context-bar.can-scroll-left .context-bar-inner::before, .context-bar.can-scroll-right .context-bar-inner::after { opacity: 1; }
     .context-bar-label { display: none; }
-    .context-items { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; gap: 5px; margin: 0; padding: 0 8px; list-style: none; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-padding-inline: 8px; scrollbar-width: thin; }
+    .context-items { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; gap: 5px; margin: 0; padding: 0; list-style: none; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-padding-inline: 0; scrollbar-width: thin; }
     .context-bar.has-context-actions .context-items { padding-right: 58px; scroll-padding-inline: 8px 58px; }
     .context-bar.has-context-actions-double .context-items { padding-right: 102px; scroll-padding-inline: 8px 102px; }
     .context-item { flex: 0 0 auto; min-width: 0; display: flex; }

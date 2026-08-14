@@ -373,10 +373,12 @@ export const chatStyles = css`
     .notification-header { gap: 4px; padding-inline: 8px; }
     .notification-list { padding-inline: 8px; }
   }
-  .chat { --pi-chat-sticky-top: -28px; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; height: 100%; min-height: 0; overflow: auto; overflow-anchor: none; padding: 28px var(--pi-main-padding-inline, 18px) 80px; box-sizing: border-box; }
+  .chat { --pi-chat-sticky-top: -28px; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; height: 100%; min-height: 0; overflow: auto; overflow-anchor: none; scrollbar-gutter: stable both-edges; padding: 28px var(--pi-main-padding-inline, 18px) 12px; box-sizing: border-box; }
+  .chat > :last-child { margin-bottom: 0; }
   .chat > * { box-sizing: border-box; width: 100%; max-width: var(--pi-main-content-max, 960px); justify-self: center; }
   .scroll-marker { display: block; height: 0; overflow: hidden; pointer-events: none; }
   .activity-dock { position: absolute; left: 50%; right: auto; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 8px; width: calc(100% - var(--pi-main-padding-inline, 18px) - var(--pi-main-padding-inline, 18px)); max-width: var(--pi-main-content-max, 960px); min-width: 0; box-sizing: border-box; transform: translateX(-50%); border: 1px solid var(--pi-border); border-radius: 999px; background: var(--pi-bg-overlay); color: var(--pi-muted); padding: 8px 12px; font-size: 13px; pointer-events: none; box-shadow: 0 8px 28px var(--pi-shadow); backdrop-filter: blur(6px); }
+  .activity-dock { display: none; }
   .activity-dock.active { border-color: var(--pi-success-border); color: var(--pi-success); background: var(--pi-success-bg-overlay); }
   .activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .45; flex: 0 0 auto; }
@@ -389,6 +391,15 @@ export const chatStyles = css`
   .msg.tool-execution-shell, .msg.ask-user-record-shell { padding: 0; border: 0; background: transparent; color: var(--pi-text); }
   .msg.ask-user-record-shell ask-user-card { margin: 0 auto; }
   .msg.system { color: var(--pi-danger); }
+  .msg.system > summary { display: flex; align-items: baseline; gap: 8px; min-height: 24px; padding: 0; color: var(--pi-muted); cursor: pointer; list-style: none; transition: color .12s ease; }
+  .msg.system > summary::-webkit-details-marker { display: none; }
+  .msg.system > summary::before { content: ""; flex: 0 0 auto; box-sizing: border-box; width: 8px; height: 8px; margin: 0 3px 0 2px; border: solid var(--pi-muted); border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: border-color .12s ease, transform .12s ease; }
+  .msg.system > summary:hover, .msg.system > summary:focus-visible { color: var(--pi-text-secondary); }
+  .msg.system > summary:focus-visible { outline: 2px solid var(--pi-accent); outline-offset: -2px; }
+  .msg.system > summary .label { margin: 0; }
+  .msg.system[open] > summary { position: sticky; top: var(--pi-chat-sticky-top); z-index: 4; margin: -16px -18px 12px; padding: 9px 14px 8px; border-radius: 11px 11px 0 0; border-bottom: 1px solid color-mix(in srgb, var(--pi-border-muted) 35%, transparent); background: var(--pi-surface); box-shadow: 0 8px 18px var(--pi-shadow-soft); }
+  .msg.system[open] > summary::before { transform: rotate(45deg); }
+  .system-preview { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pi-muted); font: 13px var(--pi-control-font-family, system-ui, sans-serif); }
   .msg.bash { border-color: var(--pi-success); background: var(--pi-success-bg); }
   .msg.skill { border-color: var(--pi-purple-border); background: var(--pi-purple-surface); }
   .msg.event-group { padding: 0; border-color: var(--pi-border); background: var(--pi-surface); color: var(--pi-muted); }
@@ -424,6 +435,7 @@ export const chatStyles = css`
   .group-msg.tool { border-color: var(--pi-warning-border); background: var(--pi-warning-surface); }
   .group-msg.bash { border-color: var(--pi-success-border); background: var(--pi-success-bg); }
   .group-msg.skill { border-color: var(--pi-purple-border); background: var(--pi-purple-surface); }
+  .group-msg:not(.wide, .tool-execution-shell) > .part { max-width: var(--pi-main-reading-max, 920px); margin-inline: auto; }
   .history-boundary { position: relative; z-index: 5; display: grid; gap: 3px; justify-items: center; margin: 0 0 18px; color: var(--pi-muted); font-size: 12px; text-align: center; }
   .history-load-button { border: 1px solid var(--pi-border); border-radius: 999px; background: var(--pi-surface); color: var(--pi-text-secondary); padding: 5px 12px; font: 12px var(--pi-control-font-family, system-ui, sans-serif); cursor: pointer; }
   .history-load-button:hover, .history-load-button:focus { border-color: var(--pi-accent); color: var(--pi-text-bright); }
@@ -490,14 +502,12 @@ export const chatStyles = css`
   summary { cursor: pointer; color: var(--pi-muted); }
   pre { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; direction: ltr; text-align: left; unicode-bidi: isolate; }
   .shell-output { color: var(--pi-text); font-family: var(--pi-content-code-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: var(--pi-content-code-font-size, 13px); font-weight: var(--pi-content-code-font-weight, 400); line-height: var(--pi-content-code-line-height, 1.45); direction: ltr; text-align: left; unicode-bidi: isolate; }
-  @container pi-chat (min-width: 761px) {
-    .chat { scrollbar-gutter: stable both-edges; }
-  }
   @container pi-chat (max-width: 760px) {
-    .chat { --pi-chat-sticky-top: -20px; padding: 20px 12px 68px; }
+    .chat { --pi-chat-sticky-top: -20px; padding: 20px 12px 12px; }
     .activity-dock { width: calc(100% - 24px); }
     .msg { padding: 14px; }
     .msg > .msg-header { margin: -14px -14px 10px; padding: 8px 10px 7px; }
+    .msg.system[open] > summary { margin: -14px -14px 10px; padding: 8px 10px 7px; }
     .group-body { padding: 0 14px 14px; }
     .queued-messages, .session-activity { margin-bottom: 14px; padding: 14px; }
     .history-boundary { margin-bottom: 14px; }
@@ -542,15 +552,19 @@ export const formattedTextStyles = css`
 
 export const statusBarStyles = css`
   :host { display: block; color: var(--pi-muted); font: 12px var(--pi-control-font-family, system-ui, sans-serif); }
-  .bar { display: flex; justify-content: flex-end; gap: 12px; align-items: center; min-width: 0; padding: 7px 12px; border-top: 1px solid var(--pi-border); background: var(--pi-bg); white-space: nowrap; overflow: hidden; }
+  .bar { display: flex; align-items: center; min-width: 0; padding: 7px var(--pi-main-padding-inline, 18px); background: var(--pi-bg); overflow: hidden; }
+  .bar-inner { position: relative; flex: 1 1 auto; min-width: 0; max-width: var(--pi-main-content-max, 960px); margin-inline: auto; display: flex; justify-content: flex-end; gap: 12px; align-items: center; box-sizing: border-box; white-space: nowrap; overflow: hidden; }
+  .bar-inner::before { content: ""; position: absolute; top: -7px; left: 0; right: 0; border-top: 1px solid var(--pi-border); }
   span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .warning-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; margin-right: auto; border: 0; background: transparent; color: inherit; padding: 0; font: inherit; line-height: 1; white-space: nowrap; cursor: pointer; }
+  .status-left { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; justify-content: flex-start; overflow: hidden; }
+  .warning-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: inherit; padding: 0; font: inherit; line-height: 1; white-space: nowrap; cursor: pointer; }
   .warning-toggle:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
   .warning-toggle-icon { flex: 0 0 auto; width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .activity { display: inline-flex; align-items: center; gap: 6px; color: var(--pi-muted); }
+  .activity { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding-left: 3px; color: var(--pi-muted); }
   .activity.active { color: var(--pi-success); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .45; flex: 0 0 auto; }
   .activity.active .dot { animation: pulse 1s ease-in-out infinite; opacity: 1; }
+  .activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .muted { color: var(--pi-dim); }
   @keyframes pulse { 0%, 100% { transform: scale(.75); opacity: .55; } 50% { transform: scale(1.2); opacity: 1; } }
 `;
@@ -567,14 +581,15 @@ export const autocompleteStyles = css`
 
 export const promptEditorStyles = css`
   :host { position: relative; z-index: 5; display: block; color: var(--pi-text); font: 14px var(--pi-control-font-family, system-ui, sans-serif); container: pi-prompt / inline-size; }
-  footer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 14px var(--pi-main-padding-inline, 18px); border-top: 1px solid var(--pi-border); }
+  footer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 var(--pi-main-padding-inline, 18px) 14px; }
   footer > .editor-wrap, footer > .actions { box-sizing: border-box; width: 100%; max-width: var(--pi-main-content-max, 960px); margin-inline: auto; }
-  footer.shell-mode { border-top-color: var(--pi-success); background: var(--pi-success-bg); }
-  .editor-wrap { position: relative; min-width: 0; }
+  footer.shell-mode { background: var(--pi-success-bg); }
+  .editor-wrap { position: relative; min-width: 0; margin-bottom: 12px; }
   .actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; }
   .compact-status { display: flex; min-width: 0; align-items: center; gap: 6px; color: var(--pi-muted); font-size: 12px; flex: 1 1 0; }
   .compact-status > button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .select-model { max-width: min(42vw, 320px); }
+  .select-model { height: 36px; padding: 0 10px; box-sizing: border-box; line-height: 34px; }
   .icon-button { font: inherit; flex: 0 0 auto; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; }
   .icon-button .prompt-action-icon, .icon-button .prompt-thinking-gauge { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   .icon-button .prompt-action-icon-filled { fill: currentColor; stroke: none; }
@@ -582,15 +597,15 @@ export const promptEditorStyles = css`
   .stop-button:not(:disabled) { color: var(--pi-danger); }
   .select-thinking .prompt-thinking-gauge .gauge-bar { fill: currentColor; stroke: none; opacity: .28; }
   .select-thinking .prompt-thinking-gauge .gauge-bar-active { opacity: 1; }
-  .editor-attach { position: absolute; right: 8px; bottom: 8px; z-index: 2; width: 30px; height: 30px; }
+  .editor-wrap .editor-attach { position: absolute; right: 8px; bottom: 8px; z-index: 2; width: 30px; height: 30px; padding: 0; box-sizing: border-box; }
   .editor-attach .prompt-action-icon { width: 16px; height: 16px; }
-  textarea, .markdown-editor .cm-editor { box-sizing: border-box; width: 100%; min-height: 54px; max-height: 220px; resize: none; overflow: hidden; border-radius: 8px; border: 1px solid var(--pi-border); background: var(--pi-bg); color: var(--pi-text); font: var(--pi-control-font-size, 16px)/1.4 var(--pi-control-font-family, system-ui, sans-serif); }
-  textarea { overflow-y: auto; padding: 8px; }
-  .markdown-editor .cm-scroller { flex-grow: 1; max-height: 220px; overflow-y: auto; font-family: var(--pi-control-font-family, system-ui, sans-serif); line-height: 1.4; }
+  textarea, .markdown-editor .cm-editor { box-sizing: border-box; width: 100%; min-height: 48px; max-height: 124px; resize: none; overflow: hidden; border-radius: 8px; border: 1px solid var(--pi-border); background: var(--pi-bg); color: var(--pi-text); font: 14px/1.4 var(--pi-control-font-family, system-ui, sans-serif); }
+  textarea { overflow-y: auto; padding: 12px; }
+  .markdown-editor .cm-scroller { flex-grow: 1; max-height: 124px; overflow-y: auto; font-family: var(--pi-control-font-family, system-ui, sans-serif); line-height: 1.4; }
   .markdown-editor .cm-scroller:has(.cm-placeholder) { overflow: visible; }
-  .markdown-editor .cm-content { position: relative; align-self: stretch; width: 100%; max-width: 100%; min-height: 38px; padding: 8px 44px 8px 8px; caret-color: var(--pi-text); text-align: start; unicode-bidi: plaintext; }
+  .markdown-editor .cm-content { position: relative; align-self: stretch; width: 100%; max-width: 100%; min-height: 46px; padding: 12px 44px 12px 8px; caret-color: var(--pi-text); text-align: start; unicode-bidi: plaintext; }
   .markdown-editor .cm-line { padding: 0; unicode-bidi: plaintext; }
-  .markdown-editor .cm-placeholder { position: absolute; top: 8px; left: 8px; right: 44px; color: var(--pi-dim); white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+  .markdown-editor .cm-placeholder { position: absolute; top: 12px; left: 8px; right: 44px; color: var(--pi-dim); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
   .markdown-editor .cm-focused { outline: none; }
   .shell-mode textarea, .shell-mode .markdown-editor .cm-editor { border-color: var(--pi-success); box-shadow: 0 0 0 1px var(--pi-success-ring); }
   .mode-hint { position: absolute; right: 46px; bottom: 8px; max-width: calc(100% - 54px); border: 1px solid var(--pi-success-border); border-radius: 999px; background: var(--pi-success-surface); color: var(--pi-success); padding: 2px 8px; font-size: 12px; pointer-events: none; }
@@ -609,7 +624,7 @@ export const promptEditorStyles = css`
     footer { padding-inline: 12px; }
   }
   @container pi-prompt (max-width: 640px) {
-    footer { gap: 8px; padding: 8px; }
+    footer { gap: 0; padding: 0 12px 8px; }
     .actions { gap: 6px; }
     .compact-status { flex: 1 1 220px; gap: 4px; }
     .select-model { max-width: min(58vw, 260px); }
@@ -618,6 +633,7 @@ export const promptEditorStyles = css`
   @container pi-prompt (max-width: 430px) {
     .compact-status { flex-basis: 170px; font-size: 11px; }
     .select-model { max-width: 48vw; }
+    .select-model { height: 34px; line-height: 32px; }
     button { font: inherit; padding: 5px 7px; }
     .icon-button { width: 34px; height: 34px; }
   }

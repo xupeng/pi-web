@@ -142,6 +142,23 @@ export function chatGroupAnchorKey(startIndex: number): string {
   return `g:${String(startIndex)}`;
 }
 
+/** The disclosure storage key for a collapsed system message at `index`. */
+export function systemDisclosureKey(sessionId: string, index: number): string {
+  return `${sessionId}:sys:${String(index)}`;
+}
+
+/** Whether a system message collapses into a summary line (text-bearing ones). */
+export function chatSystemMessageIsCollapsible(message: ChatLine): boolean {
+  return message.parts.some((part): part is Extract<ChatPart, { type: "text" }> => part.type === "text");
+}
+
+/** Single-line preview shown while a system message stays collapsed. */
+export function chatSystemMessagePreview(message: ChatLine): string {
+  const text = message.parts.find((part): part is Extract<ChatPart, { type: "text" }> => part.type === "text")?.text ?? "";
+  const firstLine = text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
+  return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
+}
+
 /** The stable scroll-anchor key for an event inside a group at `index`. */
 export function chatEventAnchorKey(index: number): string {
   return `e:${String(index)}`;
@@ -877,6 +894,7 @@ export class ChatView extends LitElement {
   }
 
   private renderMessage(message: ChatLine, index: number) {
+    if (message.role === "system" && chatSystemMessageIsCollapsible(message)) return this.renderSystemMessage(message, index);
     const toolOnly = this.isToolExecutionOnlyMessage(message);
     const askUserRecordOnly = this.isAskUserRecordOnlyMessage(message);
     const shellClass = toolOnly ? "msg tool-execution-shell" : "msg ask-user-record-shell";
@@ -886,6 +904,22 @@ export class ChatView extends LitElement {
         ${toolOnly || askUserRecordOnly ? null : this.renderMessageHeader(message, String(index))}
         ${message.parts.map((part) => this.renderPart(part, message))}
       </article>
+    `;
+  }
+
+  private renderSystemMessage(message: ChatLine, index: number) {
+    const disclosureKey = systemDisclosureKey(this.sessionId, index);
+    const open = this.disclosures.isOpen(disclosureKey, false);
+    return html`
+      ${this.renderScrollMarker(this.messageScrollMarkerId(index))}
+      <details class=${chatMessageClassName(message)} data-index=${index} data-scroll-anchor-id=${this.messageAnchorKey(index)} ?open=${open} @toggle=${(event: Event) => { this.onSystemMessageToggle(disclosureKey, event); }}>
+        <summary>
+          <b class="label">system</b>
+          <span class="system-preview">${chatSystemMessagePreview(message)}</span>
+        </summary>
+        ${open ? this.renderMessageHeader(message, String(index)) : null}
+        ${open ? message.parts.map((part) => this.renderPart(part, message)) : null}
+      </details>
     `;
   }
 
@@ -1053,6 +1087,12 @@ export class ChatView extends LitElement {
     const details = event.currentTarget;
     if (!(details instanceof HTMLDetailsElement)) return;
     if (this.disclosures.applyToggle(key, details.open, defaultOpen)) this.requestUpdate();
+  }
+
+  private onSystemMessageToggle(key: string, event: Event) {
+    const details = event.currentTarget;
+    if (!(details instanceof HTMLDetailsElement)) return;
+    if (this.disclosures.applyToggle(key, details.open, false)) this.requestUpdate();
   }
 
   private onScroll() {

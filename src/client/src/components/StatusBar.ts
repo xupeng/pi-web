@@ -1,6 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import type { SessionStatus } from "../api";
+import type { SessionActivity, SessionStatus } from "../api";
+import { chatActivityPresentation } from "../chatActivity";
 import { formatCost, formatTokenCount } from "../utils/format";
 import { renderSessionWarningIcon, statusBarStyles } from "./shared";
 
@@ -21,6 +22,8 @@ export function statusBarWarningControlContent(count: number, expanded: boolean)
 @customElement("status-bar")
 export class StatusBar extends LitElement {
   @property({ attribute: false }) status?: SessionStatus;
+  @property({ attribute: false }) activity?: SessionActivity;
+  @property({ type: Boolean }) sending = false;
   @property({ type: Number }) warningCount = 0;
   @property({ type: Boolean }) warningsExpanded = false;
   @property({ attribute: false }) onToggleWarnings?: () => void;
@@ -40,26 +43,37 @@ export class StatusBar extends LitElement {
       : "context unknown";
     const tokens = status.tokens;
     const warningControl = statusBarWarningControlContent(this.warningCount, this.warningsExpanded);
+    const activity = chatActivityPresentation(this.activity, status, this.sending);
     return html`
       <div class="bar">
-        ${warningControl === undefined || this.onToggleWarnings === undefined ? null : html`
-          <button
-            type="button"
-            class="warning-toggle"
-            title=${warningControl.accessibleLabel}
-            aria-label=${warningControl.accessibleLabel}
-            aria-expanded=${String(this.warningsExpanded)}
-            @click=${this.handleToggleWarnings}
-          >
-            ${renderSessionWarningIcon("warning", "warning-toggle-icon")}
-            <span>${warningControl.countText}</span>
-          </button>
-        `}
-        <span>↑${formatTokenCount(tokens.input)}</span>
-        <span>↓${formatTokenCount(tokens.output)}</span>
-        <span class="context">${contextText}</span>
-        <span>${formatCost(status.cost)}</span>
-        ${status.pendingMessageCount > 0 ? html`<span>${String(status.pendingMessageCount)} queued</span>` : null}
+        <div class="bar-inner">
+          <div class="status-left">
+            ${activity === undefined ? null : html`
+              <span class=${activity.active ? "activity active" : "activity"} role="status" aria-live="polite">
+                <span class="dot" aria-hidden="true"></span>
+                <span class="activity-text">${activity.text}</span>
+              </span>
+            `}
+            ${warningControl === undefined || this.onToggleWarnings === undefined ? null : html`
+              <button
+                type="button"
+                class="warning-toggle"
+                title=${warningControl.accessibleLabel}
+                aria-label=${warningControl.accessibleLabel}
+                aria-expanded=${String(this.warningsExpanded)}
+                @click=${this.handleToggleWarnings}
+              >
+                ${renderSessionWarningIcon("warning", "warning-toggle-icon")}
+                <span>${warningControl.countText}</span>
+              </button>
+            `}
+          </div>
+          <span>↑${formatTokenCount(tokens.input)}</span>
+          <span>↓${formatTokenCount(tokens.output)}</span>
+          <span class="context">${contextText}</span>
+          <span>${formatCost(status.cost)}</span>
+          ${status.pendingMessageCount > 0 ? html`<span>${String(status.pendingMessageCount)} queued</span>` : null}
+        </div>
       </div>
     `;
   }

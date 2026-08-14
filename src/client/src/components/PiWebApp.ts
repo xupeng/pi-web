@@ -2065,7 +2065,7 @@ export class PiWebApp extends LitElement {
   private renderStatusBar(state: AppState) {
     const warningCount = this.sessionWarningVisibility.warningCount;
     return html`
-      <status-bar .status=${state.status} .warningCount=${warningCount} .warningsExpanded=${warningCount > 0 && !this.sessionWarningVisibility.collapsed} .onToggleWarnings=${this.handleToggleWarnings}></status-bar>
+      <status-bar .status=${state.status} .activity=${state.activity} .sending=${state.selectedSession === undefined ? false : state.sendingPrompts[state.selectedSession.id] === true} .warningCount=${warningCount} .warningsExpanded=${warningCount > 0 && !this.sessionWarningVisibility.collapsed} .onToggleWarnings=${this.handleToggleWarnings}></status-bar>
     `;
   }
 

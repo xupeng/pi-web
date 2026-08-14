@@ -6,9 +6,11 @@ import {
   notificationTrayIsCollapsed,
   type SelectedSessionNotificationView,
 } from "../sessionNotifications";
-import { chatStyles, type ChatLine } from "./shared";
+import { chatStyles, type ChatLine, type ChatPart } from "./shared";
 import {
   ChatView,
+  chatSystemMessageIsCollapsible,
+  chatSystemMessagePreview,
   chatEventAnchorKey,
   chatGroupAnchorKey,
   chatGroupScrollMarkerId,
@@ -19,6 +21,7 @@ import {
   chatQueuedMessageSections,
   chatQueuedSectionShowsClearAction,
   chatSessionWarningRows,
+  systemDisclosureKey,
 } from "./ChatView";
 import { templateEventHandlerAfterMarker, templateEventHandlerNearMarker } from "../templateInspection.testSupport";
 
@@ -27,6 +30,53 @@ describe("chatStyles skill metadata containment", () => {
     expect(chatStyles.cssText).toMatch(
       /\.skill-invocation > small,\s*\.skill-read > small\s*\{[^}]*overflow-wrap:\s*anywhere;/u,
     );
+  });
+});
+
+describe("chatStyles transcript width seams", () => {
+  // Group-body messages (event-group expansions, compaction summaries) must use
+  // the same reading width as top-level prose instead of stretching full width.
+  it("caps group-body prose at the shared reading width", () => {
+    expect(chatStyles.cssText).toMatch(/\.group-msg:not\(\.wide,\s*\.tool-execution-shell\)\s*>\s*\.part\s*\{[^}]*max-width:\s*var\(--pi-main-reading-max,\s*920px\)/u);
+  });
+
+  it("styles the collapsed system summary and its single-line preview", () => {
+    expect(chatStyles.cssText).toMatch(/\.msg\.system\s*>\s*summary\s*\{/u);
+    expect(chatStyles.cssText).toMatch(/\.system-preview\s*\{[^}]*text-overflow:\s*ellipsis/u);
+  });
+});
+
+describe("chat system message collapse seams", () => {
+  it("derives a stable per-session disclosure key without colliding with event groups", () => {
+    expect(systemDisclosureKey("session-1", 40)).toBe("session-1:sys:40");
+    expect(systemDisclosureKey("session-1", 41)).toBe("session-1:sys:41");
+    expect(systemDisclosureKey("session-2", 40)).toBe("session-2:sys:40");
+  });
+
+  it("collapses only text-bearing system messages so interactive records stay visible", () => {
+    expect(chatSystemMessageIsCollapsible({ role: "system", parts: [{ type: "text", text: "Trellis context" }] })).toBe(true);
+    expect(chatSystemMessageIsCollapsible({ role: "system", parts: [{ type: "skillInvocation", name: "guide", location: "/guide", content: "doc" }] })).toBe(false);
+    expect(chatSystemMessageIsCollapsible({ role: "system", parts: [] })).toBe(false);
+  });
+
+  it("previews the trimmed first line of the system text", () => {
+    const message: ChatLine = { role: "system", parts: [{ type: "text", text: "  Trellis session context\nlong body\n" }] };
+    expect(chatSystemMessagePreview(message)).toBe("Trellis session context");
+  });
+
+  it("skips leading blank lines when previewing", () => {
+    const message: ChatLine = { role: "system", parts: [{ type: "text", text: "\n\nTrellis session context\nmore" }] };
+    expect(chatSystemMessagePreview(message)).toBe("Trellis session context");
+  });
+
+  it("falls back to an empty preview when the message has no text part", () => {
+    const message: ChatLine = { role: "system", parts: [] };
+    expect(chatSystemMessagePreview(message)).toBe("");
+  });
+
+  it("truncates overlong previews", () => {
+    const longLine = "x".repeat(200);
+    expect(chatSystemMessagePreview({ role: "system", parts: [{ type: "text", text: longLine }] })).toBe(`${"x".repeat(117)}…`);
   });
 });
 
@@ -355,6 +405,53 @@ describe("ChatView event-group disclosure wiring", () => {
   });
 });
 
+describe("ChatView system-message disclosure wiring", () => {
+  const message: ChatLine = { role: "system", parts: [{ type: "text", text: "Trellis session context\nlong body" }] };
+
+  it("defers a closed system message body until it is opened", () => {
+    const view = new ChatView();
+    view.sessionId = "session-1";
+    const partCalls = observePartRenders(view);
+
+    renderSystemMessage(view, message, 40);
+
+    expect(partCalls).toEqual([]);
+  });
+
+  // Escape hatch: verifies the native `<details>` `@toggle` wiring whose
+  // observable effect is a re-render rendering (or deferring) the body, using
+  // the same stub-details pattern as the event-group disclosure tests.
+  it("renders the body after a toggle-open and defers it when closed again", () => {
+    const view = new ChatView();
+    view.sessionId = "session-1";
+    const partCalls = observePartRenders(view);
+    const initiallyClosed = renderSystemMessage(view, message, 40);
+
+    dispatchDetailsToggle(templateEventHandlerAfterMarker(initiallyClosed, "@toggle="), true);
+    renderSystemMessage(view, message, 40);
+
+    expect(partCalls).toEqual([{ part: message.parts[0], message }]);
+
+    partCalls.length = 0;
+    dispatchDetailsToggle(templateEventHandlerAfterMarker(initiallyClosed, "@toggle="), false);
+    renderSystemMessage(view, message, 40);
+
+    expect(partCalls).toEqual([]);
+  });
+
+  it("renders the header alongside the body once the system message is opened", () => {
+    const view = new ChatView();
+    view.sessionId = "session-1";
+    const headerCalls = observeHeaderRenders(view);
+    const initiallyClosed = renderSystemMessage(view, message, 40);
+
+    dispatchDetailsToggle(templateEventHandlerAfterMarker(initiallyClosed, "@toggle="), true);
+    renderSystemMessage(view, message, 40);
+
+    expect(headerCalls).toEqual([{ message, key: "40" }]);
+  });
+});
+
 interface GroupBodyRenderCall {
   messages: ChatLine[];
   startIndex: number;
@@ -363,6 +460,9 @@ interface GroupBodyRenderCall {
 type RenderQueuedMessages = (this: ChatView) => TemplateResult;
 type RenderMessageGroup = (this: ChatView, messages: ChatLine[], startIndex: number, endIndex: number, defaultOpen: boolean) => TemplateResult;
 type RenderMessageGroupBody = (this: ChatView, messages: ChatLine[], startIndex: number) => TemplateResult;
+type RenderSystemMessage = (this: ChatView, message: ChatLine, index: number) => TemplateResult;
+type RenderPart = (this: ChatView, part: ChatPart, message?: ChatLine) => TemplateResult | null;
+type RenderMessageHeader = (this: ChatView, message: ChatLine, key: string, label?: string) => TemplateResult;
 type RenderWarnings = (this: ChatView) => TemplateResult | null;
 type RenderNotificationTray = (this: ChatView) => TemplateResult | null;
 type FocusPendingNotificationTarget = (this: ChatView) => void;
@@ -378,6 +478,12 @@ function renderMessageGroup(view: ChatView, messages: ChatLine[], startIndex: nu
   const method: unknown = Reflect.get(view, "renderMessageGroup");
   if (!isRenderMessageGroup(method)) throw new Error("ChatView.renderMessageGroup is not callable");
   return method.call(view, messages, startIndex, endIndex, defaultOpen);
+}
+
+function renderSystemMessage(view: ChatView, message: ChatLine, index: number): TemplateResult {
+  const method: unknown = Reflect.get(view, "renderSystemMessage");
+  if (!isRenderSystemMessage(method)) throw new Error("ChatView.renderSystemMessage is not callable");
+  return method.call(view, message, index);
 }
 
 function renderWarnings(view: ChatView): TemplateResult | null {
@@ -410,6 +516,40 @@ function observeGroupBodyRenders(view: ChatView): GroupBodyRenderCall[] {
   return calls;
 }
 
+interface PartRenderCall {
+  part: ChatPart;
+  message?: ChatLine;
+}
+
+function observePartRenders(view: ChatView): PartRenderCall[] {
+  const method: unknown = Reflect.get(view, "renderPart");
+  if (!isRenderPart(method)) throw new Error("ChatView.renderPart is not callable");
+  const calls: PartRenderCall[] = [];
+  const observed: RenderPart = function (part, message) {
+    calls.push({ part, ...(message === undefined ? {} : { message }) });
+    return method.call(this, part, message);
+  };
+  if (!Reflect.set(view, "renderPart", observed)) throw new Error("Could not observe ChatView.renderPart");
+  return calls;
+}
+
+interface HeaderRenderCall {
+  message: ChatLine;
+  key: string;
+}
+
+function observeHeaderRenders(view: ChatView): HeaderRenderCall[] {
+  const method: unknown = Reflect.get(view, "renderMessageHeader");
+  if (!isRenderMessageHeader(method)) throw new Error("ChatView.renderMessageHeader is not callable");
+  const calls: HeaderRenderCall[] = [];
+  const observed: RenderMessageHeader = function (message, key) {
+    calls.push({ message, key });
+    return method.call(this, message, key);
+  };
+  if (!Reflect.set(view, "renderMessageHeader", observed)) throw new Error("Could not observe ChatView.renderMessageHeader");
+  return calls;
+}
+
 function isRenderQueuedMessages(value: unknown): value is RenderQueuedMessages {
   return typeof value === "function";
 }
@@ -419,6 +559,18 @@ function isRenderMessageGroup(value: unknown): value is RenderMessageGroup {
 }
 
 function isRenderMessageGroupBody(value: unknown): value is RenderMessageGroupBody {
+  return typeof value === "function";
+}
+
+function isRenderSystemMessage(value: unknown): value is RenderSystemMessage {
+  return typeof value === "function";
+}
+
+function isRenderPart(value: unknown): value is RenderPart {
+  return typeof value === "function";
+}
+
+function isRenderMessageHeader(value: unknown): value is RenderMessageHeader {
   return typeof value === "function";
 }
 

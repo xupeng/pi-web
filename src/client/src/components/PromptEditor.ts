@@ -285,7 +285,7 @@ export class PromptEditor extends LitElement {
             keyup: (event) => this.handleEditorKeyUp(event),
             blur: () => this.resetEditorModifierState(),
           }),
-          placeholder("Message pi... Use / for commands, @ for tracked files, @ space for all files, # for models"),
+          placeholder("/ for commands, @ files, # models"),
           this.editableCompartment.of(EditorView.editable.of(!this.disabled)),
           this.readOnlyCompartment.of(EditorState.readOnly.of(this.disabled)),
           EditorView.updateListener.of((update) => {
@@ -329,8 +329,9 @@ export class PromptEditor extends LitElement {
       return;
     }
     const placeholderHeight = placeholder.getBoundingClientRect().height;
-    // placeholder content + .cm-content vertical padding (2 * 8px) + editor border (2px)
-    const minHeight = Math.min(Math.max(54, Math.ceil(placeholderHeight) + 18), 220);
+    // placeholder content + .cm-content vertical padding (2 * 8px) + editor border (2px);
+    // one line at rest, growing up to five lines of input
+    const minHeight = Math.min(Math.max(48, Math.ceil(placeholderHeight) + 26), 124);
     editor.dom.style.minHeight = `${String(minHeight)}px`;
     if (typeof ResizeObserver === "undefined") return;
     this.placeholderHeightObserver = new ResizeObserver(() => { this.syncPlaceholderHeight(); });
