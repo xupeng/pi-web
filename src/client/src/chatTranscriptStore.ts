@@ -1,5 +1,5 @@
 import { normalizeMessages } from "./chatMessages";
-import { applyTranscriptEvent, seedStreamingPartial } from "./chatTranscript";
+import { appendEchoMessage, applyTranscriptEvent, seedStreamingPartial } from "./chatTranscript";
 import { mergeChatHistory, readChatHistoryCache, removeChatHistoryCache, writeChatHistoryCache, type RawMessagePage } from "./chatHistoryCache";
 import type { ChatLine } from "./components/shared";
 import type { SessionUiEvent } from "./sessionSocket";
@@ -43,6 +43,10 @@ export class ChatTranscriptStore {
 
   applyLiveEvent(messages: ChatLine[], event: SessionUiEvent): ChatLine[] | undefined {
     return applyTranscriptEvent(messages, event);
+  }
+
+  applyEchoMessage(messages: ChatLine[], rawMessage: unknown, workspacePath: string | undefined): ChatLine[] {
+    return appendEchoMessage(messages, rawMessage, workspacePath);
   }
 
   /**

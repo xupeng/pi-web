@@ -1220,7 +1220,7 @@ export type CommandResult =
 export type SessionUiEvent = SessionUiEventBody & { seq?: number };
 
 type SessionUiEventBody =
-  | { type: "message.append"; message: unknown }
+  | { type: "message.append"; message: unknown; echoRef?: boolean }
   | { type: "assistant.delta"; text: string }
   | { type: "assistant.thinking.delta"; text: string }
   | { type: "tool.start"; toolName: string; toolCallId: string; summary: string; args?: unknown }

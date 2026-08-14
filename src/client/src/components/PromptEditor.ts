@@ -11,6 +11,7 @@ import { capturePromptAttachments, effectivePromptAttachmentDelivery, isInlinePr
 import { inputModeForDraft, inputModesEqual, type InputMode } from "../inputModes";
 import { machineSessionKey } from "../machineKeys";
 import { detectPromptCompletionTrigger, fileCompletionInsertText, modelCompletionChoices, type PromptCompletionTrigger } from "../promptCompletions";
+import { createImageThumbnail } from "../attachmentThumbnails";
 import { clearDraft, loadDraft, saveDraft } from "../promptDraftStorage";
 import { loadAttachmentDelivery, saveAttachmentDelivery } from "../attachmentPreferences";
 import { createMobilePromptEnterMedia, readPromptEnterPreference, shouldSendPromptOnEnterShortcut, shouldUsePromptEnterShiftShortcut } from "../promptEnterBehavior";
@@ -19,7 +20,7 @@ import { renderAttachIcon, renderSendIcon, renderQueueIcon, renderSteerIcon, ren
 import { thinkingGauge, thinkingLevelLabel } from "../../../shared/thinkingLevels";
 import "./AutocompleteMenu";
 
-type PendingAttachment = CapturedAttachment & { id: string };
+type PendingAttachment = CapturedAttachment & { id: string; previewData?: string };
 
 @customElement("prompt-editor")
 export class PromptEditor extends LitElement {
@@ -201,7 +202,10 @@ export class PromptEditor extends LitElement {
 
   private renderAttachmentPreview(attachment: PendingAttachment) {
     if (isInlinePromptAttachment(attachment)) {
-      return html`<img src=${`data:${attachment.mimeType};base64,${attachment.data}`} alt=${attachment.name} />`;
+      if (attachment.previewData === undefined) {
+        return html`<div class="attachment-file-preview" aria-hidden="true">${fileExtensionLabel(attachment.name)}</div>`;
+      }
+      return html`<img src=${`data:${attachment.mimeType};base64,${attachment.previewData}`} alt=${attachment.name} />`;
     }
     return html`
       <div class="attachment-file-preview" aria-hidden="true">${fileExtensionLabel(attachment.name)}</div>
@@ -254,9 +258,26 @@ export class PromptEditor extends LitElement {
     this.attachmentError = undefined;
     const { attachments, error } = await capturePromptAttachments(files, readFileAsBase64);
     if (attachments.length > 0) {
-      this.attachments = [...this.attachments, ...attachments.map((attachment) => ({ id: `attachment-${String(++this.attachmentSeq)}`, ...attachment }))];
+      const pending = await Promise.all(attachments.map(async (attachment) => {
+        const previewData = attachment.kind === "image" ? await this.thumbnailFor(attachment) : undefined;
+        return {
+          id: `attachment-${String(++this.attachmentSeq)}`,
+          ...attachment,
+          ...(previewData === undefined ? {} : { previewData }),
+        };
+      }));
+      this.attachments = [...this.attachments, ...pending];
     }
     if (error !== undefined) this.attachmentError = error;
+  }
+
+  /** Small preview for the attachment chip; failures only drop the preview, never the attachment. */
+  private async thumbnailFor(attachment: CapturedAttachment): Promise<string | undefined> {
+    try {
+      return await createImageThumbnail(attachment.data, attachment.mimeType);
+    } catch {
+      return undefined;
+    }
   }
 
   private currentAttachments(): PromptAttachment[] {

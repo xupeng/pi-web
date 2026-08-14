@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ASK_USER_ANSWERS_CUSTOM_TYPE, type AskUserOutcome } from "../../shared/apiTypes";
 import { groupChatMessages } from "./chatGroups";
 import { normalizeMessages, textMessage } from "./chatMessages";
-import { applyTranscriptEvent, seedStreamingPartial } from "./chatTranscript";
+import { appendEchoMessage, applyTranscriptEvent, seedStreamingPartial } from "./chatTranscript";
 import type { ChatLine } from "./components/shared";
 
 const askUserOutcome: AskUserOutcome = {
@@ -555,10 +555,72 @@ describe("applyTranscriptEvent", () => {
     ]);
   });
 
+  it("reconciles the finalized absolute-path user message with the echoed relative-reference line", () => {
+    const messages = [textMessage("user", "describe this\n\n@.pi-web/attachments/attachment-1-shot.png")];
+    const finalized = {
+      role: "user",
+      content: "describe this\n\n@/Users/xupeng/dev/personal/pi-web/.pi-web/attachments/attachment-1-shot.png",
+      timestamp: "2026-05-09T12:00:00.000Z",
+    };
+
+    expect(applyTranscriptEvent(messages, { type: "message.end", message: finalized })).toEqual([
+      { ...textMessage("user", "describe this\n\n@.pi-web/attachments/attachment-1-shot.png"), meta: { timestamp: "2026-05-09T12:00:00.000Z" } },
+    ]);
+  });
+
+  it("appends a finalized user message that differs beyond the attachment path", () => {
+    const messages = [textMessage("user", "earlier question")];
+    const finalized = { role: "user", content: "different prompt\n\n@.pi-web/attachments/attachment-1-shot.png" };
+
+    expect(applyTranscriptEvent(messages, { type: "message.end", message: finalized })).toEqual([
+      textMessage("user", "earlier question"),
+      textMessage("user", "different prompt\n\n@.pi-web/attachments/attachment-1-shot.png"),
+    ]);
+  });
+
   it("seeds a null or undefined partial as a no-op", () => {
     const messages = [textMessage("user", "question")];
     expect(seedStreamingPartial(messages, null)).toBe(messages);
     expect(seedStreamingPartial(messages, undefined)).toBe(messages);
+  });
+
+  it("replaces the persisted absolute-path user message with the relative-reference echo", () => {
+    const persisted = textMessage("user", "describe this\n\n@/Users/xupeng/dev/personal/pi-web/.pi-web/attachments/attachment-1-shot.png");
+    const echo = { role: "user", content: "describe this\n\n@.pi-web/attachments/attachment-1-shot.png" };
+
+    expect(appendEchoMessage([persisted], echo, "/Users/xupeng/dev/personal/pi-web")).toEqual([
+      textMessage("user", "describe this\n\n@.pi-web/attachments/attachment-1-shot.png"),
+    ]);
+  });
+
+  it("appends the echo when the last user line is a different message", () => {
+    const messages = [textMessage("user", "earlier question")];
+    const echo = { role: "user", content: "new prompt\n\n@.pi-web/attachments/attachment-1-shot.png" };
+
+    expect(appendEchoMessage(messages, echo, "/Users/xupeng/dev/personal/pi-web")).toEqual([
+      textMessage("user", "earlier question"),
+      textMessage("user", "new prompt\n\n@.pi-web/attachments/attachment-1-shot.png"),
+    ]);
+  });
+
+  it("appends instead of replacing when the workspace path is unknown", () => {
+    const persisted = textMessage("user", "describe this\n\n@/Users/xupeng/dev/personal/pi-web/.pi-web/attachments/attachment-1-shot.png");
+    const echo = { role: "user", content: "describe this\n\n@.pi-web/attachments/attachment-1-shot.png" };
+
+    expect(appendEchoMessage([persisted], echo, undefined)).toEqual([
+      persisted,
+      textMessage("user", "describe this\n\n@.pi-web/attachments/attachment-1-shot.png"),
+    ]);
+  });
+
+  it("appends the echo when the last line is not a user message", () => {
+    const messages = [textMessage("assistant", "already answered")];
+    const echo = { role: "user", content: "new prompt\n\n@.pi-web/attachments/attachment-1-shot.png" };
+
+    expect(appendEchoMessage(messages, echo, "/Users/xupeng/dev/personal/pi-web")).toEqual([
+      textMessage("assistant", "already answered"),
+      textMessage("user", "new prompt\n\n@.pi-web/attachments/attachment-1-shot.png"),
+    ]);
   });
 
   it("seeds an in-flight assistant partial with text and thinking so live deltas append onto it", () => {

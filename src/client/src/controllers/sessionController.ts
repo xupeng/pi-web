@@ -1476,6 +1476,15 @@ export class SessionController {
       this.applyClosedDialog(event.dialogId, event.reason, event.answer);
       return;
     }
+    if (event.type === "message.append" && event.echoRef === true) {
+      // The echo mirrors a user message the server already persisted with
+      // absolute @-path references. A refresh may have surfaced that persisted
+      // line first; reconcile instead of appending a near-identical duplicate.
+      const workspacePath = this.getState().selectedWorkspace?.path;
+      const transcript = this.transcripts.applyEchoMessage(this.getState().messages, event.message, workspacePath);
+      if (transcript !== this.getState().messages) this.setState({ messages: transcript });
+      return;
+    }
     const transcript = this.transcripts.applyLiveEvent(this.getState().messages, event);
     if (transcript) {
       this.setState({ messages: transcript });

@@ -41,7 +41,10 @@ export function seedStreamingPartial(messages: ChatLine[], partial: unknown): Ch
 }
 
 export function applyTranscriptEvent(messages: ChatLine[], event: SessionUiEvent): ChatLine[] | undefined {
-  if (event.type === "message.append") return appendNewMessage(messages, event.message);
+  if (event.type === "message.append") {
+    if (event.echoRef === true) return appendEchoMessage(messages, event.message, undefined);
+    return appendNewMessage(messages, event.message);
+  }
   if (event.type === "assistant.delta") return appendText(messages, "assistant", event.text);
   if (event.type === "assistant.thinking.delta") return appendThinking(messages, event.text);
   if (event.type === "tool.start") return appendToolExecutionStart(messages, event);
@@ -87,7 +90,25 @@ function applyFinalLine(messages: ChatLine[], displayEnded: ChatLine): ChatLine[
   const last = messages.at(-1);
   if (last?.role !== displayEnded.role) return [...messages, displayEnded];
   if (displayEnded.role === "assistant" || sameMessageText(last, displayEnded)) return [...messages.slice(0, -1), displayEnded];
+  if (sameNormalizedUserText(last, displayEnded)) {
+    // The server echoes the relative @-reference form while the persisted user
+    // message carries absolute paths. When the finalized message matches the
+    // echoed line up to that path difference, keep the relative form the user
+    // already saw and only adopt the finalized metadata.
+    return [...messages.slice(0, -1), { ...last, ...(displayEnded.meta === undefined ? {} : { meta: displayEnded.meta }) }];
+  }
   return [...messages, displayEnded];
+}
+
+function sameNormalizedUserText(left: ChatLine, right: ChatLine): boolean {
+  if (left.role !== "user" || right.role !== "user") return false;
+  return normalizeAttachmentRefs(messageText(left)) === normalizeAttachmentRefs(messageText(right));
+}
+
+function normalizeAttachmentRefs(text: string): string {
+  // Normalize "@.pi-web/attachments/..." and "@/…/.pi-web/attachments/…" to the
+  // relative form so the echoed and persisted user messages compare equal.
+  return text.replace(/@[^\s]*?\.pi-web\/attachments\//g, "@.pi-web/attachments/");
 }
 
 function reconcileFinalAskUserRecord(
@@ -339,6 +360,35 @@ function messageText(message: ChatLine): string {
 function appendNewMessage(messages: ChatLine[], rawMessage: unknown): ChatLine[] {
   const lines = normalizeMessage(rawMessage);
   return lines.length === 0 ? messages : [...messages, ...lines];
+}
+
+/**
+ * Append a user echo that mirrors a message already persisted with absolute
+ * @-path references (the server converts inline attachments to on-disk paths
+ * for non-vision models). A history refresh may have surfaced that persisted
+ * message first; when the last user line is the same message with the
+ * references resolved against `workspacePath`, replace it with the echoed
+ * (relative-reference) form instead of appending a duplicate line.
+ */
+export function appendEchoMessage(messages: ChatLine[], rawMessage: unknown, workspacePath: string | undefined): ChatLine[] {
+  const lines = normalizeMessage(rawMessage);
+  if (lines.length === 0) return messages;
+  const echo = lines[0];
+  if (echo === undefined) return messages;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const line = messages[index];
+    if (line?.role !== "user") continue;
+    return isSameUserEcho(line, echo, workspacePath)
+      ? [...messages.slice(0, index), echo, ...messages.slice(index + 1)]
+      : [...messages, echo];
+  }
+  return [...messages, echo];
+}
+
+function isSameUserEcho(historyLine: ChatLine, echoLine: ChatLine, workspacePath: string | undefined): boolean {
+  if (workspacePath === undefined) return false;
+  const resolvedEcho = messageText(echoLine).replace(/@\.pi-web\/attachments\//g, `@${workspacePath}/.pi-web/attachments/`);
+  return messageText(historyLine) === resolvedEcho;
 }
 
 function appendLine(messages: ChatLine[], line: ChatLine): ChatLine[] {

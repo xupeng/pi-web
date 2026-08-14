@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ASK_USER_TEXT_MAX_LENGTH, EXTENSION_DIALOG_TEXT_MAX_LENGTH, SESSION_NOTIFICATION_LIMIT, SESSION_NOTIFICATION_MESSAGE_BYTES, SESSION_UNREAD_CATALOG_ID_MAX_LENGTH } from "../../../shared/apiTypes";
-import { parseAskUserCloseResponse, parseAuthProvidersResponse, parseCommandResult, parseExtensionDialogCloseResponse, parseFileContentResponse, parseFileSuggestion, parseMachineRuntime, parseMessagePage, parseOAuthFlowState, parsePiPackageMutationResponse, parsePiPackagesResponse, parsePiWebConfigResponse, parsePiWebPluginsResponse, parsePiWebRuntimeResponse, parsePiWebStatusResponse, parseSessionBulkArchiveResponse, parseSessionBulkDeleteArchivedResponse, parseSessionCleanupExecuteResponse, parseSessionCleanupPreviewResponse, parseSessionInfo, parseSessionNotificationInboxEvent, parseSessionNotificationInboxSnapshot, parseSessionStartupProgressEvent, parseSessionStatus, parseSessionStreamSnapshot, parseSessionTreeForkResult, parseSessionTreeNavigateResult, parseSessionTreeSnapshot, parseSessionUnreadCatalogSnapshot, parseSessionUnreadEvent, parseSlashCommand, parseTerminalCommandRun, parseTerminalInfo, parseWorkspace, parseWorkspaceProviderResolution } from "./parsers";
+import { parseAskUserCloseResponse, parseAuthProvidersResponse, parseCommandResult, parseExtensionDialogCloseResponse, parseFileContentResponse, parseFileSuggestion, parseMachineRuntime, parseMessagePage, parseOAuthFlowState, parsePiPackageMutationResponse, parsePiPackagesResponse, parsePiWebConfigResponse, parsePiWebPluginsResponse, parsePiWebRuntimeResponse, parsePiWebStatusResponse, parseSessionBulkArchiveResponse, parseSessionBulkDeleteArchivedResponse, parseSessionCleanupExecuteResponse, parseSessionCleanupPreviewResponse, parseSessionInfo, parseSessionNotificationInboxEvent, parseSessionNotificationInboxSnapshot, parseSessionStartupProgressEvent, parseSessionStatus, parseSessionStreamEvent, parseSessionStreamSnapshot, parseSessionTreeForkResult, parseSessionTreeNavigateResult, parseSessionTreeSnapshot, parseSessionUnreadCatalogSnapshot, parseSessionUnreadEvent, parseSlashCommand, parseTerminalCommandRun, parseTerminalInfo, parseWorkspace, parseWorkspaceProviderResolution } from "./parsers";
 
 describe("API parsers", () => {
   it("preserves interactive API-key flow hints and defaults providers without one", () => {
@@ -1254,3 +1254,17 @@ function notificationInboxWire() {
     dismissThrough: { order: 1, overflowWatermark: 0 },
   };
 }
+
+describe("session stream event parsing", () => {
+  it("preserves the echoRef marker on message.append frames", () => {
+    const marked = parseSessionStreamEvent({ type: "message.append", message: { role: "user", content: "hi" }, echoRef: true });
+    expect(marked.type).toBe("message.append");
+    if (marked.type !== "message.append") throw new Error("expected message.append");
+    expect(marked.echoRef).toBe(true);
+
+    const plain = parseSessionStreamEvent({ type: "message.append", message: { role: "user", content: "hi" } });
+    expect(plain.type).toBe("message.append");
+    if (plain.type !== "message.append") throw new Error("expected message.append");
+    expect(plain.echoRef).toBeUndefined();
+  });
+});

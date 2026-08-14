@@ -674,7 +674,11 @@ export function parseSessionStreamEvent(value: unknown): SessionUiEvent {
     case "message.append":
       // The message payload is a projected Pi message; only its presence is
       // guaranteed at this boundary.
-      return { type: "message.append", message: requirePresent(record, "message") };
+      return {
+        type: "message.append",
+        message: requirePresent(record, "message"),
+        ...optionalField("echoRef", optionalBoolean(record, "echoRef")),
+      };
     case "assistant.delta":
       return { type: "assistant.delta", text: requireString(record, "text") };
     case "assistant.thinking.delta":

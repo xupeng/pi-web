@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
@@ -2016,12 +2016,28 @@ export class PiSessionService implements SessionRouteService {
       this.enqueuePromptDuringCompaction(session, promptText, behavior ?? "followUp", images, echoUserMessage);
       return;
     }
-    void this.submitPrompt(session, promptText, behavior, images, echoUserMessage, await this.modelBoundPromptText(active.runtime.cwd, session, promptText, parsedAttachments));
+    const attachmentNote = (await this.modelBoundPromptText(active.runtime.cwd, session, promptText, parsedAttachments))
+      ?? this.resolveAttachmentReferences(active.runtime.cwd, promptText);
+    // Images are delivered inline only when the model can see them; the
+    // folder-delivery conversion above replaces inline delivery with on-disk
+    // @-references, matching the existing "Save to .pi-web/attachments" mode.
+    const sendImages = attachmentNote === undefined ? images : [];
+    void this.submitPrompt(session, attachmentNote?.echoText ?? promptText, behavior, sendImages, echoUserMessage, attachmentNote?.modelText);
   }
 
   private submitPrompt(session: PiAgentSession, text: string, behavior: QueuedPromptKind | undefined, images: ImageContent[] = [], echoUserMessage = true, modelText?: string): Promise<void> {
     this.publishActivity(session, behavior === "steer" ? "steering queued" : behavior === "followUp" ? "message queued" : "prompt accepted", "active");
-    if (behavior === undefined && echoUserMessage) this.events.publish(session.sessionId, { type: "message.append", message: userMessage(text, images) });
+    if (behavior === undefined && echoUserMessage) {
+      // When the model-bound text differs from the echoed text (inline
+      // attachments converted to absolute @-path references), mark the echo so
+      // the client can reconcile it against the persisted user message instead
+      // of appending a second, near-identical line after a history refresh.
+      this.events.publish(session.sessionId, {
+        type: "message.append",
+        message: userMessage(text, images),
+        ...(modelText === undefined ? {} : { echoRef: true }),
+      });
+    }
     const promptOptions = buildPromptOptions(behavior, images);
     const promptPromise = this.runSessionEntryMutation(session, "send a prompt", () => session.prompt(modelText ?? text, promptOptions)).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -2033,22 +2049,43 @@ export class PiSessionService implements SessionRouteService {
   }
 
   /**
-   * When the session model cannot view images inline, pi drops the image blocks
-   * from the message before it reaches the model. Save the attachments to the
-   * workspace and append a note with their relative paths so the model can read
-   * them with a local tool (e.g. an `analyze_image` extension). Saving failures
-   * must never block the prompt: fall back to the plain text and keep sending.
+   * When the session model cannot view images inline, mirror the existing
+   * "Save to .pi-web/attachments" delivery: save the attachments to the
+   * workspace and reference them from the prompt as compact `@path` mentions.
+   * The echo keeps the same relative references the folder delivery shows,
+   * while the model-bound text resolves them to absolute paths so file tools
+   * (e.g. an `analyze_image` extension) can read them regardless of the
+   * process working directory. Saving failures must never block the prompt:
+   * fall back to the plain text and keep sending.
    */
-  private async modelBoundPromptText(cwd: string, session: PiAgentSession, text: string, attachments: PromptImageAttachment[]): Promise<string | undefined> {
+  private async modelBoundPromptText(cwd: string, session: PiAgentSession, text: string, attachments: PromptImageAttachment[]): Promise<{ echoText: string; modelText: string } | undefined> {
     if (modelSupportsImages(session.model) || attachments.length === 0) return undefined;
     try {
       const saved = await saveAttachmentsToWorkspace(cwd, attachments);
       if (saved.length === 0) return undefined;
-      return `${text}\n\n${imagePathNote(saved.map((entry) => entry.path))}`;
+      const references = saved.map((entry) => `@${entry.path}`).join(" ");
+      const absoluteReferences = saved.map((entry) => `@${resolve(cwd, entry.path)}`).join(" ");
+      return {
+        echoText: text === "" ? references : `${text}\n\n${references}`,
+        modelText: text === "" ? absoluteReferences : `${text}\n\n${absoluteReferences}`,
+      };
     } catch (error: unknown) {
       console.warn("[pi-web] failed to save prompt attachments for non-vision model:", error);
       return undefined;
     }
+  }
+
+  /**
+   * Folder delivery ("Save to .pi-web/attachments") resolves the on-disk
+   * references for the model just like inline attachments do: the echo keeps
+   * the compact relative `@path` the user already sees, while the model-bound
+   * text carries absolute paths so file tools can read them regardless of the
+   * process working directory.
+   */
+  private resolveAttachmentReferences(cwd: string, text: string): { echoText: string; modelText: string } | undefined {
+    if (!text.includes("@.pi-web/attachments/")) return undefined;
+    const modelText = text.replace(/@\.pi-web\/attachments\//g, `@${resolve(cwd, ".pi-web/attachments")}/`);
+    return modelText === text ? undefined : { echoText: text, modelText };
   }
 
   private enqueuePromptDuringCompaction(session: PiAgentSession, text: string, kind: QueuedPromptKind, images: ImageContent[] = [], echoUserMessage = true): void {
@@ -4144,19 +4181,6 @@ function buildPromptOptions(behavior: QueuedPromptKind | undefined, images: Imag
 /** Whether the session model can consume inline image content. Undefined (no model yet) is treated as vision-capable. */
 function modelSupportsImages(model: AgentModel | undefined): boolean {
   return model?.input.includes("image") ?? true;
-}
-
-/**
- * Note appended to the model-bound prompt text when the session model cannot
- * view images: the attachments were saved to the workspace, and the model is
- * pointed at their relative paths so it can read them with a local tool (e.g.
- * an `analyze_image` extension). Written in English, mirroring pi's own
- * `(image omitted: ...)` placeholder wording.
- */
-function imagePathNote(paths: readonly string[]): string {
-  const list = paths.map((path) => `  ${path}`).join("\n");
-  const count = String(paths.length);
-  return `[The user attached ${paths.length === 1 ? "an image" : `${count} images`} that this model cannot view directly. The image content was omitted from the message. The attachment(s) were saved to the workspace and can be read with a local file tool (e.g. analyze_image):\n${list}\nUse that tool on each path to see the image content.]`;
 }
 
 function stringValue(value: unknown): string {

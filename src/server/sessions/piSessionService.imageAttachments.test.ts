@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PiSessionService, type PiAgentSession } from "./piSessionService.js";
+import type { SessionUiEvent } from "../../shared/apiTypes.js";
 import { CapturingSessionEventHub, fakeRuntime, fakeSessionManager, runtimeCreator, sessionGateway, sessionRecord, sessionRef, testModel } from "./piSessionService.testSupport.js";
 import * as attachmentService from "./attachmentService.js";
 
@@ -54,7 +55,7 @@ describe("PiSessionService image attachments for non-vision models", () => {
     });
   }
 
-  it("saves attachments and appends path notes for non-vision models", async () => {
+  it("saves attachments and references them with @ paths for non-vision models", async () => {
     const fake = fakeRuntime("img-non-vision", {
       model: nonVisionModel(),
       sessionManager: fakeSessionManager(workspace),
@@ -64,31 +65,49 @@ describe("PiSessionService image attachments for non-vision models", () => {
 
     await service.prompt(sessionRef("img-non-vision", workspace), "What is in this image?", undefined, [imageAttachment()]);
 
-    // Prompt text sent to the model carries the note with the relative path.
+    // The model-bound text carries compact @-references resolved to absolute
+    // paths, so file tools can read them regardless of the process cwd.
     expect(fake.calls.prompt).toHaveLength(1);
     const sent = singlePromptCall(fake.calls.prompt);
-    expect(sent.text).toContain("analyze_image");
-    expect(sent.text).toContain(".pi-web/attachments/attachment-");
+    expect(sent.text).toContain(`@${join(workspace, ".pi-web", "attachments", "attachment-")}`);
     expect(sent.text).toContain("shot.png");
     expect(sent.text).toContain("What is in this image?");
+    expect(sent.text).not.toContain("analyze_image");
+    // Images are no longer delivered inline; the folder-delivery conversion
+    // replaces inline delivery with the on-disk references.
+    expect(sent.options).toBeUndefined();
 
     // The file actually landed in the workspace attachment folder.
     const saved = await readdir(join(workspace, ".pi-web", "attachments"));
     expect(saved).toHaveLength(1);
     expect(saved[0]).toContain("shot.png");
 
-    // The UI echo keeps the plain text + image blocks; no note leaks to the UI.
+    // The UI echo mirrors the "Save to .pi-web/attachments" delivery: the user
+    // text followed by compact relative @-references, without image blocks.
     const echo = hub.sessionEvents.find(({ event }) => event.type === "message.append");
     expect(echo).toBeDefined();
     const content = JSON.stringify(echo?.event);
-    expect(JSON.stringify(content)).not.toContain("analyze_image");
     expect(content).toContain("What is in this image?");
-    expect(content).toContain("image/png");
+    expect(content).toContain("@.pi-web/attachments/attachment-");
+    expect(content).not.toContain("image/png");
+    // The echo is marked so the client can reconcile it against the persisted
+    // absolute-path user message instead of appending a duplicate line.
+    const appendEvents = hub.sessionEvents.filter(
+      (entry): entry is { sessionId: string; event: Extract<SessionUiEvent, { type: "message.append" }> } => entry.event.type === "message.append",
+    );
+    expect(appendEvents.at(-1)?.event.echoRef).toBe(true);
+
+    // A plain prompt without attachments echoes without the marker.
+    await service.prompt(sessionRef("img-non-vision", workspace), "no attachment here");
+    const plainAppend = hub.sessionEvents.filter(
+      (entry): entry is { sessionId: string; event: Extract<SessionUiEvent, { type: "message.append" }> } => entry.event.type === "message.append",
+    ).at(-1);
+    expect(plainAppend?.event.echoRef).toBeUndefined();
 
     await service.dispose();
   });
 
-  it("lists every path when multiple images are attached", async () => {
+  it("references every image when multiple are attached", async () => {
     const fake = fakeRuntime("img-multi", {
       model: nonVisionModel(),
       sessionManager: fakeSessionManager(workspace),
@@ -102,8 +121,11 @@ describe("PiSessionService image attachments for non-vision models", () => {
 
     expect(fake.calls.prompt).toHaveLength(1);
     const sent = singlePromptCall(fake.calls.prompt);
+    expect(sent.text).toContain(join(workspace, ".pi-web", "attachments"));
     expect(sent.text).toContain("one.png");
     expect(sent.text).toContain("two.png");
+    expect(/@\S+one\.png/.exec(sent.text)).not.toBeNull();
+    expect(/@\S+two\.png/.exec(sent.text)).not.toBeNull();
     const saved = await readdir(join(workspace, ".pi-web", "attachments"));
     expect(saved).toHaveLength(2);
     await service.dispose();
@@ -135,6 +157,43 @@ describe("PiSessionService image attachments for non-vision models", () => {
 
     expect(fake.calls.prompt).toEqual([{ text: "Just text", options: undefined }]);
     await expect(readdir(join(workspace, ".pi-web"))).rejects.toThrow();
+    await service.dispose();
+  });
+
+  it("resolves folder-delivery @ references to absolute paths for the model", async () => {
+    const fake = fakeRuntime("folder-abs", {
+      model: nonVisionModel(),
+      sessionManager: fakeSessionManager(workspace),
+    });
+    const hub = new CapturingSessionEventHub();
+    const service = buildService(fake, hub);
+
+    await service.prompt(sessionRef("folder-abs", workspace), "Look at this\n\n@.pi-web/attachments/attachment-1-shot.png");
+
+    // The model-bound text carries the absolute path so file tools can read it.
+    const sent = singlePromptCall(fake.calls.prompt);
+    expect(sent.text).toContain(`@${join(workspace, ".pi-web", "attachments")}/attachment-1-shot.png`);
+    expect(sent.text).toContain("Look at this");
+
+    // The echo keeps the relative reference the user already saw.
+    const echo = hub.sessionEvents.find(({ event }) => event.type === "message.append");
+    const content = JSON.stringify(echo?.event);
+    expect(content).toContain("@.pi-web/attachments/attachment-1-shot.png");
+    expect(content).not.toContain(join(workspace, ".pi-web", "attachments"));
+
+    await service.dispose();
+  });
+
+  it("leaves non-attachment @ references untouched", async () => {
+    const fake = fakeRuntime("folder-other-ref", {
+      model: nonVisionModel(),
+      sessionManager: fakeSessionManager(workspace),
+    });
+    const service = buildService(fake);
+
+    await service.prompt(sessionRef("folder-other-ref", workspace), "see @some/other/path and @.pi-web/other/file.txt");
+
+    expect(singlePromptCall(fake.calls.prompt).text).toBe("see @some/other/path and @.pi-web/other/file.txt");
     await service.dispose();
   });
 
